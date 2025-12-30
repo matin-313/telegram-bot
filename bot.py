@@ -87,16 +87,16 @@ def is_admin(uid): return uid in SUPER_ADMINS or uid in VIEWER_ADMINS
 # ======================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [
-            InlineKeyboardButton("⚽ فوتسال", callback_data="sport:futsal"),
-            InlineKeyboardButton("🏀 بسکتبال", callback_data="sport:basketball"),
-            InlineKeyboardButton("🏐 والیبال", callback_data="sport:volleyball"),
-        ]
+        ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"]
     ]
 
     await update.message.reply_text(
         "🏟 لطفاً رشته مورد نظر را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True
+        )
     )
 
 # ======================================================
@@ -216,11 +216,19 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
 #  sport select
 # ======================================================
 
-async def sport_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
-    sport = query.data.split(":")[1]
+    sport_map = {
+        "⚽ فوتسال": "futsal",
+        "🏀 بسکتبال": "basketball",
+        "🏐 والیبال": "volleyball"
+    }
+
+    if text not in sport_map:
+        return
+
+    sport = sport_map[text]
     today = datetime.now().strftime("%Y-%m-%d")
 
     context.user_data.clear()
@@ -241,24 +249,21 @@ async def sport_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     slots = cursor.fetchall()
     if not slots:
-        await query.edit_message_text("❌ تایمی برای امروز وجود ندارد")
+        await update.message.reply_text("❌ تایمی برای امروز وجود ندارد")
         return
 
     keyboard = []
     for s in slots:
         if sport == "futsal":
-            text = f"{s[1]} - {s[2]} | گروه {s[3]}"
+            label = f"{s[1]} - {s[2]} | گروه {s[3]}"
         else:
-            text = f"{s[1]} - {s[2]}"
+            label = f"{s[1]} - {s[2]}"
 
         keyboard.append([
-            InlineKeyboardButton(
-                text,
-                callback_data=f"time:{s[0]}"
-            )
+            InlineKeyboardButton(label, callback_data=f"time:{s[0]}")
         ])
 
-    await query.edit_message_text(
+    await update.message.reply_text(
         "⏰ تایم‌های امروز:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -295,10 +300,14 @@ def main():
     app.add_handler(CommandHandler("addtime", add_time))
     app.add_handler(CommandHandler("today", today_list))
 
-    app.add_handler(CallbackQueryHandler(sport_select, pattern="^sport:"))
     app.add_handler(CallbackQueryHandler(time_select, pattern="^time:"))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, register))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^(⚽ فوتسال|🏀 بسکتبال|🏐 والیبال)$"),
+        sport_text_select
+    ))
+
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
