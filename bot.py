@@ -25,7 +25,7 @@ from telegram.ext import (
 # ======================================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-SUPER_ADMINS = [11111111]
+SUPER_ADMINS = [6807376124]
 VIEWER_ADMINS = [22222222]
 
 DB_NAME = "sports.db"
@@ -175,7 +175,7 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         await update.message.reply_text("✅ بازیکن اضافه شد")
     except:
-        await update.message.reply_text("❌ خطا در دستور")
+        await updaSUPER_ADMINS = [11111111]te.message.reply_text("❌ خطا در دستور")
 
 async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
