@@ -186,7 +186,7 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = context.args[0]
         phone = context.args[1]
         sport = context.args[2]
-        group = context.args[3] if len(context.args) >= 4 else None  # گروه اختیاری
+        group = context.args[3] if len(context.args) > 3 else None  # گروه اختیاری
 
         cursor.execute(
             "INSERT INTO players (full_name, phone, sport, futsal_group) VALUES (?,?,?,?)",
@@ -212,7 +212,7 @@ async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start = context.args[2]
         end = context.args[3]
         cap = int(context.args[4])
-        group = context.args[5] if len(context.args) >= 6 else None  # گروه اختیاری
+        group = context.args[5] if len(context.args) > 5 else None  # گروه اختیاری
 
         cursor.execute(
             "INSERT INTO time_slots (date, sport, futsal_group, start, end, capacity) VALUES (?,?,?,?,?,?)",
