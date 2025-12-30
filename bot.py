@@ -132,6 +132,18 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     name, player_sport, group = player
 
+    if group:  # اگر بازیکن گروه دارد
+        cursor.execute("""
+        SELECT r.id
+        FROM registrations r
+        JOIN time_slots t ON r.time_id = t.id
+        WHERE r.phone=? AND t.futsal_group IS NOT NULL AND t.futsal_group != ?
+        """, (phone, group))
+        if cursor.fetchone():
+            await update.message.reply_text("❌ شما نمی‌توانید در گروه دیگری ثبت نام کنید")
+            return
+
+
     if player_sport != selected_sport:
         await update.message.reply_text("❌ این رشته مربوط به شما نیست")
         return
@@ -167,9 +179,18 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
     try:
-        name, phone, sport, group = context.args + [None]
+        # گروه اختیاری
+        if len(context.args) < 3:
+            await update.message.reply_text("❌ لطفاً نام، شماره و رشته را وارد کنید")
+            return
+        
+        name = context.args[0]
+        phone = context.args[1]
+        sport = context.args[2]
+        group = context.args[3] if len(context.args) > 3 else None
+        
         cursor.execute(
-            "INSERT INTO players VALUES (NULL,?,?,?,?)",
+            "INSERT INTO players (full_name, phone, sport, futsal_group) VALUES (?,?,?,?)",
             (name, phone, sport, group)
         )
         conn.commit()
@@ -181,10 +202,21 @@ async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
     try:
-        date, sport, group, start, end, cap = context.args
-        cursor.execute("""
-        INSERT INTO time_slots VALUES (NULL,?,?,?,?,?,?)
-        """, (date, sport, group, start, end, int(cap)))
+        if len(context.args) < 5:
+            await update.message.reply_text("❌ لطفاً تاریخ، رشته، شروع، پایان و ظرفیت را وارد کنید")
+            return
+        
+        date = context.args[0]
+        sport = context.args[1]
+        start = context.args[2]
+        end = context.args[3]
+        cap = int(context.args[4])
+        group = context.args[5] if len(context.args) > 5 else None
+        
+        cursor.execute(
+            "INSERT INTO time_slots (date, sport, futsal_group, start, end, capacity) VALUES (?,?,?,?,?,?)",
+            (date, sport, group, start, end, cap)
+        )
         conn.commit()
         await update.message.reply_text("✅ تایم اضافه شد")
     except:
