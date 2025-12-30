@@ -175,7 +175,7 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         await update.message.reply_text("✅ بازیکن اضافه شد")
     except:
-        await updaSUPER_ADMINS = [11111111]te.message.reply_text("❌ خطا در دستور")
+        await update.message.reply_text("❌ خطا در دستور")
 
 async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
