@@ -3,6 +3,8 @@
 # ======================================================
 import sqlite3
 import os
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import CallbackQueryHandler
 import logging
 from datetime import datetime, time
 from telegram import (
@@ -84,85 +86,76 @@ def is_admin(uid): return uid in SUPER_ADMINS or uid in VIEWER_ADMINS
 # START
 # ======================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    kb = [[KeyboardButton("📱 ارسال شماره", request_contact=True)]]
+    keyboard = [
+        [
+            InlineKeyboardButton("⚽ فوتسال", callback_data="sport:futsal"),
+            InlineKeyboardButton("🏀 بسکتبال", callback_data="sport:basketball"),
+            InlineKeyboardButton("🏐 والیبال", callback_data="sport:volleyball"),
+        ]
+    ]
+
     await update.message.reply_text(
-        "به ربات رزرو سالن خوش آمدید",
-        reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True)
+        "🏟 لطفاً رشته مورد نظر را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
-
-# ======================================================
-# HANDLE CONTACT
-# ======================================================
-async def contact_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    phone = update.message.contact.phone_number
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    cursor.execute("SELECT full_name, sport, futsal_group FROM players WHERE phone=?", (phone,))
-    p = cursor.fetchone()
-    if not p:
-        await update.message.reply_text("❌ شما در لیست بازیکن‌ها نیستید")
-        return
-
-    cursor.execute("SELECT 1 FROM registrations WHERE phone=? AND date=?", (phone, today))
-    if cursor.fetchone():
-        await update.message.reply_text("❌ امروز قبلاً ثبت‌نام کرده‌اید")
-        return
-
-    name, sport, group = p
-
-    if sport == "futsal":
-        cursor.execute(
-            "SELECT id,start,end FROM time_slots WHERE date=? AND sport=? AND futsal_group=?",
-            (today, sport, group)
-        )
-    else:
-        cursor.execute(
-            "SELECT id,start,end FROM time_slots WHERE date=? AND sport=?",
-            (today, sport)
-        )
-
-    slots = cursor.fetchall()
-    if not slots:
-        await update.message.reply_text("❌ تایمی برای شما وجود ندارد")
-        return
-
-    context.user_data["player"] = (phone, name, sport, group)
-
-    msg = "⏰ تایم‌های امروز:\n"
-    for s in slots:
-        msg += f"{s[0]} ➜ {s[1]}-{s[2]}\n"
-
-    await update.message.reply_text(msg + "\nعدد تایم را بفرست")
 
 # ======================================================
 # REGISTER TIME
 # ======================================================
 async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if "player" not in context.user_data:
+    if "time_id" not in context.user_data or "sport" not in context.user_data:
         return
 
-    time_id = update.message.text
-    phone, name, sport, group = context.user_data["player"]
+    phone = update.message.text.strip()
+    phone = phone.replace(" ", "").replace("-", "")
+
+    if not phone.isdigit() or len(phone) < 10:
+        await update.message.reply_text("❌ شماره نامعتبر است")
+        return
+
     today = datetime.now().strftime("%Y-%m-%d")
+    time_id = context.user_data["time_id"]
+    selected_sport = context.user_data["sport"]
+
+    cursor.execute("""
+    SELECT full_name, sport, futsal_group
+    FROM players
+    WHERE phone=?
+    """, (phone,))
+    player = cursor.fetchone()
+
+    if not player:
+        await update.message.reply_text("❌ شما در لیست بازیکن‌ها نیستید")
+        return
+
+    name, player_sport, group = player
+
+    if player_sport != selected_sport:
+        await update.message.reply_text("❌ این رشته مربوط به شما نیست")
+        return
+
+    cursor.execute("""
+    SELECT 1 FROM registrations
+    WHERE phone=? AND date=?
+    """, (phone, today))
+    if cursor.fetchone():
+        await update.message.reply_text("❌ امروز قبلاً ثبت‌نام کرده‌اید")
+        return
 
     cursor.execute("SELECT capacity FROM time_slots WHERE id=?", (time_id,))
-    r = cursor.fetchone()
-    if not r:
-        await update.message.reply_text("❌ تایم نامعتبر")
-        return
+    cap = cursor.fetchone()[0]
 
-    cap = r[0]
     cursor.execute("SELECT COUNT(*) FROM registrations WHERE time_id=?", (time_id,))
     if cursor.fetchone()[0] >= cap:
-        await update.message.reply_text("❌ ظرفیت تکمیل شده")
+        await update.message.reply_text("❌ ظرفیت این تایم تکمیل شده")
         return
 
     cursor.execute("""
     INSERT INTO registrations VALUES (NULL,?,?,?,?,?,?)
-    """, (phone, name, sport, group, time_id, today))
+    """, (phone, name, selected_sport, group, time_id, today))
     conn.commit()
 
-    await update.message.reply_text("✅ ثبت‌نام انجام شد")
+    await update.message.reply_text("✅ ثبت‌نام شما با موفقیت انجام شد")
     context.user_data.clear()
 
 # ======================================================
@@ -220,6 +213,73 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(admin, text or "بدون ثبت‌نام")
 
 # ======================================================
+#  sport select
+# ======================================================
+
+async def sport_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    sport = query.data.split(":")[1]
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    context.user_data.clear()
+    context.user_data["sport"] = sport
+
+    if sport == "futsal":
+        cursor.execute("""
+        SELECT id, start, end, futsal_group
+        FROM time_slots
+        WHERE date=? AND sport=?
+        """, (today, sport))
+    else:
+        cursor.execute("""
+        SELECT id, start, end
+        FROM time_slots
+        WHERE date=? AND sport=?
+        """, (today, sport))
+
+    slots = cursor.fetchall()
+    if not slots:
+        await query.edit_message_text("❌ تایمی برای امروز وجود ندارد")
+        return
+
+    keyboard = []
+    for s in slots:
+        if sport == "futsal":
+            text = f"{s[1]} - {s[2]} | گروه {s[3]}"
+        else:
+            text = f"{s[1]} - {s[2]}"
+
+        keyboard.append([
+            InlineKeyboardButton(
+                text,
+                callback_data=f"time:{s[0]}"
+            )
+        ])
+
+    await query.edit_message_text(
+        "⏰ تایم‌های امروز:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ======================================================
+#  time select
+# ======================================================
+
+async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    time_id = int(query.data.split(":")[1])
+    context.user_data["time_id"] = time_id
+
+    await query.edit_message_text(
+        "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
+    )
+
+
+# ======================================================
 # MAIN
 # ======================================================
 def main():
@@ -235,7 +295,9 @@ def main():
     app.add_handler(CommandHandler("addtime", add_time))
     app.add_handler(CommandHandler("today", today_list))
 
-    app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    app.add_handler(CallbackQueryHandler(sport_select, pattern="^sport:"))
+    app.add_handler(CallbackQueryHandler(time_select, pattern="^time:"))
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, register))
 
     # JobQueue برای گزارش شبانه
