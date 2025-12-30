@@ -405,7 +405,12 @@ def main():
     print("Bot Started")
 
     # ❗ این خودش event loop رو مدیریت می‌کنه
-    app.run_polling()
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.environ.get("PORT", 8443)),
+        webhook_url=f"https://your-app.up.railway.app/{BOT_TOKEN}"
+    )
+
 
 
 if __name__ == "__main__":
