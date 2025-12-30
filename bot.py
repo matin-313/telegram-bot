@@ -179,48 +179,51 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
     try:
-        # گروه اختیاری
         if len(context.args) < 3:
-            await update.message.reply_text("❌ لطفاً نام، شماره و رشته را وارد کنید")
+            await update.message.reply_text("❌ لطفاً حداقل نام، شماره و رشته را وارد کنید")
             return
-        
+
         name = context.args[0]
         phone = context.args[1]
         sport = context.args[2]
-        group = context.args[3] if len(context.args) > 3 else None
-        
+        group = context.args[3] if len(context.args) >= 4 else None  # گروه اختیاری
+
         cursor.execute(
             "INSERT INTO players (full_name, phone, sport, futsal_group) VALUES (?,?,?,?)",
             (name, phone, sport, group)
         )
         conn.commit()
         await update.message.reply_text("✅ بازیکن اضافه شد")
-    except:
+    except Exception as e:
+        print(e)
         await update.message.reply_text("❌ خطا در دستور")
+
 
 async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
     try:
         if len(context.args) < 5:
-            await update.message.reply_text("❌ لطفاً تاریخ، رشته، شروع، پایان و ظرفیت را وارد کنید")
+            await update.message.reply_text("❌ لطفاً حداقل تاریخ، رشته، شروع، پایان و ظرفیت را وارد کنید")
             return
-        
+
         date = context.args[0]
         sport = context.args[1]
         start = context.args[2]
         end = context.args[3]
         cap = int(context.args[4])
-        group = context.args[5] if len(context.args) > 5 else None
-        
+        group = context.args[5] if len(context.args) >= 6 else None  # گروه اختیاری
+
         cursor.execute(
             "INSERT INTO time_slots (date, sport, futsal_group, start, end, capacity) VALUES (?,?,?,?,?,?)",
             (date, sport, group, start, end, cap)
         )
         conn.commit()
         await update.message.reply_text("✅ تایم اضافه شد")
-    except:
+    except Exception as e:
+        print(e)
         await update.message.reply_text("❌ خطا در دستور")
+
 
 async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
