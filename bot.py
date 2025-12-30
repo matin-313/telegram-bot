@@ -178,42 +178,82 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
+
     try:
-        if len(context.args) < 3:
-            await update.message.reply_text("❌ لطفاً حداقل نام، شماره و رشته را وارد کنید")
+        args = context.args
+        if not args or len(args) < 2:
+            await update.message.reply_text("❌ فرمت: /addplayer نام شماره رشته [گروه]\nمثال: /addplayer علی 09123456789 futsal A")
             return
 
-        name = context.args[0]
-        phone = context.args[1]
-        sport = context.args[2]
-        group = context.args[3] if len(context.args) > 3 else None  # گروه اختیاری
+        # تلاش برای یافتن توکن شماره (اولین توکنی که فقط عدد است و طول معقول دارد)
+        phone_idx = None
+        for i, tok in enumerate(args):
+            tok_clean = tok.replace("+", "").replace("-", "").replace(" ", "")
+            if tok_clean.isdigit() and len(tok_clean) >= 9:  # حداقل طول 9 (با 0/98)
+                phone_idx = i
+                break
 
-        cursor.execute(
-            "INSERT INTO players (full_name, phone, sport, futsal_group) VALUES (?,?,?,?)",
-            (name, phone, sport, group)
-        )
-        conn.commit()
-        await update.message.reply_text("✅ بازیکن اضافه شد")
+        if phone_idx is None:
+            await update.message.reply_text("❌ شماره معتبر پیدا نشد. لطفاً شماره را هم وارد کنید.")
+            return
+
+        # حالا نام = همه توکن‌های قبل از phone_idx
+        name = " ".join(args[:phone_idx]).strip()
+        phone = args[phone_idx].replace("+", "").replace("-", "").replace(" ", "")
+        # رشته باید بعد از شماره باشد (اگر وجود نداشته باشد خطا)
+        if phone_idx + 1 >= len(args):
+            await update.message.reply_text("❌ لطفاً رشته را هم وارد کنید (مثلاً futsal).")
+            return
+
+        sport = args[phone_idx + 1].lower()
+        # گروه اختیاری: هر چی بعد از sport باشه -> اگر وجود داشته باشه، آخرین توکن را گروه می‌گیریم
+        group = args[phone_idx + 2] if (phone_idx + 2) < len(args) else None
+
+        # اگر اسم خالی بود (مثلاً کاربر فرم phone first فرستاده) می‌گذاریم نام = شماره برای جلوگیری از خالی بودن
+        if not name:
+            name = phone
+
+        # درج در دیتابیس با هندل کردن تکراری بودن شماره
+        try:
+            cursor.execute(
+                "INSERT INTO players (full_name, phone, sport, futsal_group) VALUES (?,?,?,?)",
+                (name, phone, sport, group)
+            )
+            conn.commit()
+            await update.message.reply_text("✅ بازیکن اضافه شد")
+        except sqlite3.IntegrityError:
+            await update.message.reply_text("❌ این شماره قبلاً ثبت شده است.")
+        except Exception as db_e:
+            print("DB error in add_player:", db_e)
+            await update.message.reply_text("❌ خطا در ثبت در دیتابیس")
+
     except Exception as e:
-        print(e)
-        await update.message.reply_text("❌ خطا در دستور")
+        print("Error in add_player:", e)
+        await update.message.reply_text("❌ خطا در دستور — فرمت را بررسی کنید")
 
 
 async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
     try:
-        if len(context.args) < 5:
-            await update.message.reply_text("❌ لطفاً حداقل تاریخ، رشته، شروع، پایان و ظرفیت را وارد کنید")
+        args = context.args
+        if len(args) < 5:
+            await update.message.reply_text("❌ فرمت: /addtime YYYY-MM-DD رشته شروع پایان ظرفیت [گروه]\nمثال: /addtime 2025-12-30 futsal 18:00 19:00 15 A")
             return
 
-        date = context.args[0]
-        sport = context.args[1]
-        start = context.args[2]
-        end = context.args[3]
-        cap = int(context.args[4])
-        group = context.args[5] if len(context.args) > 5 else None  # گروه اختیاری
+        date = args[0]
+        sport = args[1].lower()
+        start = args[2]
+        end = args[3]
+        try:
+            cap = int(args[4])
+        except:
+            await update.message.reply_text("❌ ظرفیت باید عدد باشد.")
+            return
 
+        group = args[5] if len(args) > 5 else None
+
+        # درج
         cursor.execute(
             "INSERT INTO time_slots (date, sport, futsal_group, start, end, capacity) VALUES (?,?,?,?,?,?)",
             (date, sport, group, start, end, cap)
@@ -221,7 +261,7 @@ async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         await update.message.reply_text("✅ تایم اضافه شد")
     except Exception as e:
-        print(e)
+        print("Error in add_time:", e)
         await update.message.reply_text("❌ خطا در دستور")
 
 
@@ -292,9 +332,11 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for s in slots:
         if sport == "futsal":
-            label = f"{s[1]} - {s[2]} | گروه {s[3]}"
+            group_label = f" | گروه {s[3]}" if s[3] else ""
+            label = f"{s[1]} - {s[2]}{group_label}"
         else:
             label = f"{s[1]} - {s[2]}"
+
 
         keyboard.append([
             InlineKeyboardButton(label, callback_data=f"time:{s[0]}")
