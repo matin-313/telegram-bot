@@ -222,10 +222,14 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
 # ======================================================
 # MAIN
 # ======================================================
-async def main():
+def main():
+    # دیتابیس رو آماده می‌کنه
     init_db()
+
+    # ساخت اپلیکیشن
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # هندلرها
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("addplayer", add_player))
     app.add_handler(CommandHandler("addtime", add_time))
@@ -234,11 +238,18 @@ async def main():
     app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, register))
 
-    app.job_queue.run_daily(daily_report, REPORT_TIME)
+    # JobQueue برای گزارش شبانه
+    app.job_queue.run_daily(
+        daily_report,
+        REPORT_TIME
+    )
 
     print("Bot Started")
-    await app.run_polling()
+
+    # ❗ این خودش event loop رو مدیریت می‌کنه
+    app.run_polling()
+
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
+
