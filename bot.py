@@ -43,39 +43,6 @@ logging.basicConfig(level=logging.INFO)
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 cursor = conn.cursor()
 
-# ====== helpers ======
-def normalize_phone(raw: str) -> str:
-    if not raw:
-        return raw
-    p = "".join(ch for ch in raw if ch.isdigit())
-    # تبدیل 98... به 0...
-    if p.startswith("98") and len(p) == 12:
-        p = "0" + p[2:]
-    # اگر با 9 شروع کنه و طول 10 باشه -> 0 + ...
-    if len(p) == 10 and p.startswith("9"):
-        p = "0" + p
-    # اگر قبلاً با 0 باشه و 11 رقم باشه، اوکی
-    return p
-
-def normalize_sport(s: str) -> str:
-    if not s:
-        return s
-    t = s.strip().lower()
-    mapping = {
-        "فوتسال": "futsal", "فوتبال_سال": "futsal", "فوتسال؟": "futsal",
-        "futsal": "futsal",
-        "بسکتبال": "basketball", "basketball": "basketball",
-        "والیبال": "volleyball", "vollyball": "volleyball", "volleyball": "volleyball"
-    }
-    return mapping.get(t, t)  # اگر نداشت همان متن کوچک‌شده را برمی‌گرداند
-
-# اختیاری: برای اطمینان از مقادیر موجود در DB (نشانگر)
-def safe_get_player_by_phone(phone_raw: str):
-    p = normalize_phone(phone_raw)
-    cursor.execute("SELECT full_name, sport, futsal_group FROM players WHERE phone=?", (p,))
-    return cursor.fetchone()
-
-
 def init_db():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS players (
@@ -140,11 +107,18 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "time_id" not in context.user_data:
         return
 
-    # normalize input phone
-    phone_input = update.message.text.strip()
-    phone = normalize_phone(phone_input)
 
-    # get player by normalized phone
+    phone = update.message.text.strip()
+    phone = phone.replace(" ", "").replace("-", "")
+
+    if not phone.isdigit() or len(phone) < 10:
+        await update.message.reply_text("❌ شماره نامعتبر است")
+        return
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    time_id = context.user_data["time_id"]
+    selected_sport = context.user_data["sport"]
+
     cursor.execute("""
     SELECT full_name, sport, futsal_group
     FROM players
@@ -156,11 +130,9 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ شما در لیست بازیکن‌ها نیستید")
         return
 
-    name, player_sport_raw, group = player
-    player_sport = normalize_sport(player_sport_raw)
+    name, player_sport, group = player
 
-    # if player has a group -> ensure not registered in other group before
-    if group:
+    if group:  # اگر بازیکن گروه دارد
         cursor.execute("""
         SELECT r.id
         FROM registrations r
@@ -171,11 +143,10 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ شما نمی‌توانید در گروه دیگری ثبت نام کنید")
             return
 
-    # compare sport normalized
+
     if player_sport != selected_sport:
         await update.message.reply_text("❌ این رشته مربوط به شما نیست")
         return
-
 
     cursor.execute("""
     SELECT 1 FROM registrations
@@ -214,11 +185,11 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ فرمت: /addplayer نام شماره رشته [گروه]\nمثال: /addplayer علی 09123456789 futsal A")
             return
 
-        # پیدا کردن ایندکس شماره (مثل قبل)
+        # تلاش برای یافتن توکن شماره (اولین توکنی که فقط عدد است و طول معقول دارد)
         phone_idx = None
         for i, tok in enumerate(args):
-            tok_clean = "".join(ch for ch in tok if ch.isdigit())
-            if tok_clean.isdigit() and len(tok_clean) >= 9:
+            tok_clean = tok.replace("+", "").replace("-", "").replace(" ", "")
+            if tok_clean.isdigit() and len(tok_clean) >= 9:  # حداقل طول 9 (با 0/98)
                 phone_idx = i
                 break
 
@@ -226,22 +197,23 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ شماره معتبر پیدا نشد. لطفاً شماره را هم وارد کنید.")
             return
 
+        # حالا نام = همه توکن‌های قبل از phone_idx
         name = " ".join(args[:phone_idx]).strip()
-        raw_phone = args[phone_idx]
-        phone = normalize_phone(raw_phone)
-
+        phone = args[phone_idx].replace("+", "").replace("-", "").replace(" ", "")
+        # رشته باید بعد از شماره باشد (اگر وجود نداشته باشد خطا)
         if phone_idx + 1 >= len(args):
             await update.message.reply_text("❌ لطفاً رشته را هم وارد کنید (مثلاً futsal).")
             return
 
-        sport_raw = args[phone_idx + 1]
-        sport = normalize_sport(sport_raw)
-
+        sport = args[phone_idx + 1].lower()
+        # گروه اختیاری: هر چی بعد از sport باشه -> اگر وجود داشته باشه، آخرین توکن را گروه می‌گیریم
         group = args[phone_idx + 2] if (phone_idx + 2) < len(args) else None
 
+        # اگر اسم خالی بود (مثلاً کاربر فرم phone first فرستاده) می‌گذاریم نام = شماره برای جلوگیری از خالی بودن
         if not name:
             name = phone
 
+        # درج در دیتابیس با هندل کردن تکراری بودن شماره
         try:
             cursor.execute(
                 "INSERT INTO players (full_name, phone, sport, futsal_group) VALUES (?,?,?,?)",
@@ -270,7 +242,7 @@ async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         date = args[0]
-        sport = normalize_sport(args[1])
+        sport = args[1].lower()
         start = args[2]
         end = args[3]
         try:
@@ -281,6 +253,7 @@ async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         group = args[5] if len(args) > 5 else None
 
+        # درج
         cursor.execute(
             "INSERT INTO time_slots (date, sport, futsal_group, start, end, capacity) VALUES (?,?,?,?,?,?)",
             (date, sport, group, start, end, cap)
@@ -436,4 +409,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
