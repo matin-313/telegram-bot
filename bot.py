@@ -94,17 +94,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🏟 لطفاً رشته مورد نظر را انتخاب کنید:",
         reply_markup=ReplyKeyboardMarkup(
             keyboard,
-            resize_keyboard=True,
-            one_time_keyboard=True
+            resize_keyboard=True
         )
     )
+
 
 # ======================================================
 # REGISTER TIME
 # ======================================================
 async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if "time_id" not in context.user_data or "sport" not in context.user_data:
+    # فقط وقتی تایم انتخاب شده اجازه ثبت شماره بده
+    if "time_id" not in context.user_data:
         return
+
 
     phone = update.message.text.strip()
     phone = phone.replace(" ", "").replace("-", "")
@@ -283,7 +285,6 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
     )
 
-
 # ======================================================
 # MAIN
 # ======================================================
@@ -300,13 +301,21 @@ def main():
     app.add_handler(CommandHandler("addtime", add_time))
     app.add_handler(CommandHandler("today", today_list))
 
-    app.add_handler(CallbackQueryHandler(time_select, pattern="^time:"))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, register))
+    # 1️⃣ انتخاب رشته با دکمه‌های پایین
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^(⚽ فوتسال|🏀 بسکتبال|🏐 والیبال)$"),
         sport_text_select
     ))
+    
+    # 2️⃣ انتخاب تایم (دکمه شیشه‌ای)
+    app.add_handler(CallbackQueryHandler(time_select, pattern="^time:"))
+    
+    # 3️⃣ وارد کردن شماره موبایل
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        register
+    ))
+
 
 
     # JobQueue برای گزارش شبانه
