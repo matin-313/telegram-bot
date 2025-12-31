@@ -77,6 +77,28 @@ def init_db():
     )""")
     conn.commit()
 
+
+# ======================================================
+# normalize phone
+# ======================================================
+def normalize_phone(raw: str) -> str:
+    """
+    تبدیل شماره‌ها به فرمت یکنواختِ دیتابیس:
+    - حذف فاصله، - و + 
+    - تبدیل 989... به 09...
+    - اگر شماره با 9 و 10 رقم بود، به 0... تبدیل می‌کنیم
+    """
+    if not raw:
+        return raw
+    p = "".join(ch for ch in raw if ch.isdigit())
+    # اگر با 98 و 12 رقم باشد -> 0 + باقی
+    if p.startswith("98") and len(p) == 12:
+        p = "0" + p[2:]
+    # اگر با 9 و 10 رقم باشد -> 0 + ...
+    if len(p) == 10 and p.startswith("9"):
+        p = "0" + p
+    return p
+
 # ======================================================
 # UTILS
 # ======================================================
@@ -109,12 +131,15 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-    phone = update.message.text.strip()
-    phone = phone.replace(" ", "").replace("-", "")
-
-    if not phone.isdigit() or len(phone) < 10:
-        await update.message.reply_text("❌ شماره نامعتبر است")
+    # دریافت و نرمال‌سازی شماره ورودی کاربر
+    raw_input = update.message.text.strip()
+    phone = normalize_phone(raw_input)
+    
+    # بررسی اولیه فرمت (حالا با نرمال‌شده)
+    if not phone or not phone.isdigit() or len(phone) < 10:
+        await update.message.reply_text("❌ شماره نامعتبر است — لطفاً مثل: 09123456789 ارسال کنید")
         return
+
 
     today = datetime.now().strftime("%Y-%m-%d")
     time_id = context.user_data["time_id"]
@@ -126,6 +151,9 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     WHERE phone=?
     """, (phone,))
     player = cursor.fetchone()
+    # نشان دادن نام کاربر پیدا شده (اطمینان)
+    await update.message.reply_text(f"👤 نام پیدا شده: {name}\nدرحال ثبت‌نام...")
+
 
     if not player:
         await update.message.reply_text("❌ شما در لیست بازیکن‌ها نیستید")
@@ -158,7 +186,12 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     cursor.execute("SELECT capacity FROM time_slots WHERE id=?", (time_id,))
-    cap = cursor.fetchone()[0]
+    row = cursor.fetchone()
+    if not row:
+        await update.message.reply_text("❌ تایم انتخاب شده نامعتبر است، لطفاً دوباره انتخاب کنید")
+        return
+    cap = row[0]
+
 
     cursor.execute("SELECT COUNT(*) FROM registrations WHERE time_id=?", (time_id,))
     if cursor.fetchone()[0] >= cap:
@@ -200,7 +233,7 @@ async def add_player(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # حالا نام = همه توکن‌های قبل از phone_idx
         name = " ".join(args[:phone_idx]).strip()
-        phone = args[phone_idx].replace("+", "").replace("-", "").replace(" ", "")
+        phone = normalize_phone(args[phone_idx])
         # رشته باید بعد از شماره باشد (اگر وجود نداشته باشد خطا)
         if phone_idx + 1 >= len(args):
             await update.message.reply_text("❌ لطفاً رشته را هم وارد کنید (مثلاً futsal).")
