@@ -456,7 +456,7 @@ async def add_futsal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE_TYPE):
+async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
 
