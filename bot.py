@@ -558,7 +558,7 @@ def main():
     ))
     
     # 2️⃣ انتخاب تایم (دکمه شیشه‌ای)
-    app.add_handler(CallbackQueryHandler(time_select))
+    CallbackQueryHandler(time_select, pattern="^(futsal|basketball|volleyball):")
     
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
