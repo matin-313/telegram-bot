@@ -48,19 +48,14 @@ RAM_PLAYERS = {
     "volleyball": {}                          # phone -> name
 }
 
-BASKETBALL_PLAYERS = set()
-VOLLEYBALL_PLAYERS = set()
-
-FUTSAL_TIMES = {chr(i): [] for i in range(ord("A"), ord("K"))}  # تایم‌های هر گروه
-
 # ======================================================
 # RAM REGISTRATIONS (ثبت نام فقط در حافظه)
 # ======================================================
 
 RAM_REGISTRATIONS = {
-    "futsal": {g: {} for g in "ABCDEFGHIJ"},  # group -> {time_id: set()}
-    "basketball": {},  # time_id -> set()
-    "volleyball": {}   # time_id -> set()
+    "futsal": {g: {} for g in "ABCDEFGHIJ"},  # group -> {time_id: {phone: name}}
+    "basketball": {},  # time_id -> {phone: name}
+    "volleyball": {}   # time_id -> {phone: name}
 }
 
 # ======================================================
@@ -134,9 +129,10 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_input = update.message.text.strip()
     phone = normalize_phone(raw_input)
 
-    if not phone.isdigit() or len(phone) < 10:
-        await update.message.reply_text("❌ شماره نامعتبر است")
+    if not phone.startswith("09") or len(phone) != 11:
+        await update.message.reply_text("❌ شماره باید مثل 09123456789 باشد")
         return
+
 
     sport = context.user_data["sport"]
     idx = context.user_data["time_index"]
@@ -144,11 +140,21 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # گرفتن تایم از RAM
     if sport == "futsal":
+        if group not in RAM_TIMES["futsal"]:
+            await update.message.reply_text("❌ گروه نامعتبر است")
+            return
+        
+        if idx >= len(RAM_TIMES["futsal"][group]):
+            await update.message.reply_text("❌ این تایم وجود ندارد")
+            return
         slot = RAM_TIMES["futsal"][group][idx]
         if idx not in RAM_REGISTRATIONS["futsal"][group]:
             RAM_REGISTRATIONS["futsal"][group][idx] = {}
         registered = RAM_REGISTRATIONS["futsal"][group][idx]
     else:
+        if idx >= len(RAM_TIMES[sport]):
+            await update.message.reply_text("❌ این تایم وجود ندارد")
+            return
         slot = RAM_TIMES[sport][idx]
         if idx not in RAM_REGISTRATIONS[sport]:
             RAM_REGISTRATIONS[sport][idx] = {}
@@ -162,10 +168,12 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = None
     
         # پیدا کردن بازیکن در گروه‌ها
-        for g in "ABCDEFGHIJ":
-            if phone in RAM_PLAYERS["futsal"][g]:
-                name = RAM_PLAYERS["futsal"][g][phone]
-                break
+        if phone not in RAM_PLAYERS["futsal"][group]:
+            await update.message.reply_text("❌ شما عضو این گروه نیستید")
+            return
+        
+        name = RAM_PLAYERS["futsal"][group][phone]
+
     
         if not name:
             await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
@@ -211,50 +219,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================================================
 # ADMIN COMMANDS
 # ======================================================
-async def add_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_super(update.effective_user.id):
-        return
-
-    args = context.args
-    if len(args) < 5:
-        await update.message.reply_text(
-            "❌ فرمت:\n/addtime YYYY-MM-DD sport start end capacity [GROUP]\n"
-            "مثال فوتسال: /addtime 2025-01-10 futsal 18:00 19:00 15 A\n"
-            "مثال بسکتبال: /addtime 2025-01-10 basketball 18:00 19:00 15"
-        )
-        return
-
-    date, sport, start, end, cap = args[:5]
-    group = None
-    if sport == "futsal":
-        if len(args) < 6:
-            await update.message.reply_text("❌ فوتسال باید گروه داشته باشد")
-            return
-        group = args[5]
-
-    if sport == "futsal" and group not in FUTSAL_GROUPS:
-        await update.message.reply_text("❌ گروه فوتسال باید بین A تا J باشد")
-        return
-    
-    # ✅ اضافه شدن تایم به RAM (مهم‌ترین بخش)
-    if sport == "futsal":
-        RAM_TIMES["futsal"][group].append({
-            "start": start,
-            "end": end,
-            "cap": int(cap),
-            "players": []
-        })
-    else:
-        RAM_TIMES[sport].append({
-            "start": start,
-            "end": end,
-            "cap": int(cap),
-            "players": []
-        })
-    
-    await update.message.reply_text("✅ تایم اضافه شد")
-    
-
 async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not is_admin(update.effective_user.id):
@@ -394,8 +358,12 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # فوتسال گروهی
     if sport == "futsal":
         group = data[1]
-        idx = int(data[2])
-
+        try:
+            idx = int(data[2])
+        except:
+            await query.edit_message_text("❌ خطا در انتخاب تایم")
+            return
+            
         context.user_data["sport"] = "futsal"
         context.user_data["group"] = group
         context.user_data["time_index"] = idx
@@ -535,6 +503,7 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
             "end": end,
             "cap": int(cap),
             "players": []
+
         })
 
         await update.message.reply_text(
@@ -592,9 +561,10 @@ def main():
     
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
+        filters.TEXT & ~filters.COMMAND & filters.Regex("^09[0-9]{9}$"),
         register
     ))
+
 
 
 
