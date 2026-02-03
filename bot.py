@@ -352,31 +352,32 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data.split(":")
-
     sport = data[0]
 
     # فوتسال گروهی
     if sport == "futsal":
         group = data[1]
+
         try:
             idx = int(data[2])
         except:
             await query.edit_message_text("❌ خطا در انتخاب تایم")
             return
-            
+
+        # ✅ اینجا بیرون except قرار گرفت
         context.user_data["sport"] = "futsal"
         context.user_data["group"] = group
         context.user_data["time_index"] = idx
 
     else:
         idx = int(data[1])
-
         context.user_data["sport"] = sport
         context.user_data["time_index"] = idx
 
     await query.edit_message_text(
         "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
     )
+
 
 
 
