@@ -348,36 +348,35 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ======================================================
 
 async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    query = update.callback_query
+    await query.answer()
 
-    data = query.data.split(":")
+    data = query.data.split(":")
+    sport = data[0]
 
-    sport = data[0]
+    # فوتسال گروهی
+    if sport == "futsal":
+        group = data[1]
 
-    # فوتسال گروهی
-    if sport == "futsal":
-        group = data[1]
-        try:
-            idx = int(data[2])
-        except:
-            await query.edit_message_text(" خطا در انتخاب تایم")
-            return
-            
-        context.user_data["sport"] = "futsal"
-        context.user_data["group"] = group
-        context.user_data["time_index"] = idx
+        try:
+            idx = int(data[2])
+        except:
+            await query.edit_message_text("❌ خطا در انتخاب تایم")
+            return
 
-    else:
-        idx = int(data[1])
+        # ✅ اینجا بیرون except قرار گرفت
+        context.user_data["sport"] = "futsal"
+        context.user_data["group"] = group
+        context.user_data["time_index"] = idx
 
-        context.user_data["sport"] = sport
-        context.user_data["time_index"] = idx
+    else:
+        idx = int(data[1])
+        context.user_data["sport"] = sport
+        context.user_data["time_index"] = idx
 
-    await query.edit_message_text(
-        " لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
+    await query.edit_message_text(
+        "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
     )
-
 
 
 
@@ -558,7 +557,7 @@ def main():
     ))
     
     # 2️⃣ انتخاب تایم (دکمه شیشه‌ای)
-    CallbackQueryHandler(time_select, pattern="^(futsal|basketball|volleyball):")
+    CallbackQueryHandler(time_select)
     
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
