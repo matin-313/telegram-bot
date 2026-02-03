@@ -61,14 +61,16 @@ logging.basicConfig(level=logging.INFO)
 conn = sqlite3.connect(DB_NAME, check_same_thread=False)
 cursor = conn.cursor()
 
+
 def init_db():
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS players (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         full_name TEXT,
         phone TEXT UNIQUE,
-        sport TEXT,
-    )""")
+        sport TEXT
+    )
+    """)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS time_slots (
@@ -77,8 +79,10 @@ def init_db():
         sport TEXT,
         start TEXT,
         end TEXT,
-        capacity INTEGER
-    )""")
+        capacity INTEGER,
+        group_code TEXT
+    )
+    """)
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS registrations (
@@ -88,8 +92,11 @@ def init_db():
         sport TEXT,
         time_id INTEGER,
         date TEXT
-    )""")
+    )
+    """)
+
     conn.commit()
+
 
 
 # ======================================================
