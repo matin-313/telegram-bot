@@ -380,6 +380,7 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
 async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
@@ -557,8 +558,8 @@ def main():
     ))
     
     # 2️⃣ انتخاب تایم (دکمه شیشه‌ای)
-    CallbackQueryHandler(time_select)
-    
+    app.add_handler(CallbackQueryHandler(time_select, pattern="^(futsal|basketball|volleyball):"))
+
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.Regex("^09[0-9]{9}$"),
