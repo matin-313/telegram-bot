@@ -125,10 +125,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if "time_index" not in context.user_data:
         return
-    print("SPORT:", sport)
-    print("GROUP:", group)
-    print("PHONE:", phone)
-    print("PLAYERS:", RAM_PLAYERS["futsal"])
 
     raw_input = update.message.text.strip()
     phone = normalize_phone(raw_input)
