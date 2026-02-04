@@ -473,23 +473,31 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         name, phone = context.args
         phone = normalize_phone(phone)
 
-        # چک نکنه تو گروه دیگه باشه
+        # اگر در همین گروه بود
+        if phone in RAM_PLAYERS["futsal"][group]:
+            await update.message.reply_text("❌ این بازیکن قبلاً در همین گروه ثبت شده")
+            return
+
+        # اگر در گروه دیگری بود
         for g in "ABCDEFGHIJ":
-            if phone in RAM_PLAYERS["futsal"][g]:
-                await update.message.reply_text("❌ این شماره قبلاً در گروه دیگری ثبت شده")
+            if g != group and phone in RAM_PLAYERS["futsal"][g]:
+                await update.message.reply_text(
+                    f"❌ این شماره قبلاً در گروه {g} ثبت شده"
+                )
                 return
 
-        # ذخیره در RAM
+        # ذخیره
         RAM_PLAYERS["futsal"][group][phone] = name
 
         await update.message.reply_text(
-            f"✅ بازیکن {name} با موفقیت به گروه فوتسال {group} اضافه شد"
+            f"✅ بازیکن {name} به گروه فوتسال {group} اضافه شد"
         )
 
     except:
         await update.message.reply_text(
             f"❌ فرمت:\n/add{group}player نام 09123456789"
         )
+
 
 
 async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
@@ -562,9 +570,10 @@ def main():
 
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.Regex("^09[0-9]{9}$"),
+        filters.TEXT & ~filters.COMMAND,
         register
     ))
+
 
 
 
