@@ -167,23 +167,25 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if sport == "futsal":
         name = None
     
-        # پیدا کردن بازیکن در گروه‌ها
-    for g in "ABCDEFGHIJ":
-        if phone in RAM_PLAYERS["futsal"][g]:
-            name = RAM_PLAYERS["futsal"][g][phone]
-            break
+    # پیدا کردن بازیکن در گروه‌ها
+  
+    # ✅ بازیکن از RAM
+    if sport == "futsal":
+        name = None
 
+        # پیدا کردن بازیکن فقط در همان گروه انتخاب‌شده
+        if phone in RAM_PLAYERS["futsal"][group]:
+            name = RAM_PLAYERS["futsal"][group][phone]
 
-    
         if not name:
-            await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
+            await update.message.reply_text("❌ شما عضو این گروه نیستید")
             return
-    
+
     else:
         if phone not in RAM_PLAYERS[sport]:
             await update.message.reply_text("❌ شما در لیست این رشته نیستید")
             return
-    
+
         name = RAM_PLAYERS[sport][phone]
 
 
