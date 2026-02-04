@@ -133,20 +133,20 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ شماره باید مثل 09123456789 باشد")
         return
 
+
     sport = context.user_data["sport"]
     idx = context.user_data["time_index"]
     group = context.user_data.get("group")  # فقط برای فوتسال
 
-    # گرفتن تایم از RAM و بررسی محدوده‌ها
+    # گرفتن تایم از RAM
     if sport == "futsal":
         if group not in RAM_TIMES["futsal"]:
             await update.message.reply_text("❌ گروه نامعتبر است")
             return
-
+        
         if idx >= len(RAM_TIMES["futsal"][group]):
             await update.message.reply_text("❌ این تایم وجود ندارد")
             return
-
         slot = RAM_TIMES["futsal"][group][idx]
         if idx not in RAM_REGISTRATIONS["futsal"][group]:
             RAM_REGISTRATIONS["futsal"][group][idx] = {}
@@ -155,51 +155,55 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if idx >= len(RAM_TIMES[sport]):
             await update.message.reply_text("❌ این تایم وجود ندارد")
             return
-
         slot = RAM_TIMES[sport][idx]
         if idx not in RAM_REGISTRATIONS[sport]:
             RAM_REGISTRATIONS[sport][idx] = {}
         registered = RAM_REGISTRATIONS[sport][idx]
 
-    capacity = slot.get("cap", 0)
+    capacity = slot["cap"]
 
-    # پیدا کردن نام بازیکن در RAM_PLAYERS
+    # ✅ بازیکن از RAM
+    
     if sport == "futsal":
-        # بررسی اینکه آیا بازیکن در *هر* گروه فوتسال هست
-        found_group = None
-        found_name = None
-        for g in "ABCDEFGHIJ":
-            if phone in RAM_PLAYERS["futsal"].get(g, {}):
-                found_group = g
-                found_name = RAM_PLAYERS["futsal"][g][phone]
-                break
+        name = None
+    
+        # پیدا کردن بازیکن در گروه‌ها
+        if phone not in RAM_PLAYERS["futsal"][group]:
+            await update.message.reply_text("❌ شما عضو این گروه نیستید")
+            return
+        
+        name = RAM_PLAYERS["futsal"][group][phone]
 
-        if not found_name:
+    
+        if not name:
             await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
             return
-
-        # اگر بازیکن در گروه دیگریست، پیام بده (اجازه ثبت‌نام در گروه غیرِ خودش رو نمیدیم)
-        if found_group != group:
-            await update.message.reply_text(
-                f"❌ شما عضو گروه {found_group} هستید — نمی‌توانید در گروه {group} ثبت‌نام کنید"
-            )
-            return
-
-        name = found_name
-
+    
     else:
         if phone not in RAM_PLAYERS[sport]:
             await update.message.reply_text("❌ شما در لیست این رشته نیستید")
             return
+    
         name = RAM_PLAYERS[sport][phone]
 
-    # جلوگیری از ثبت‌نام تکراری / ظرفیت
-    if phone in registered:
-        await update.message.reply_text("❌ شما قبلاً ثبت‌نام کرده‌اید")
-        return
 
+    # جلوگیری از ثبت‌نام تکراری فوتسال در گروه دیگر
+    if sport == "futsal":
+        for g in "ABCDEFGHIJ":
+            if g != group:
+                for users in RAM_REGISTRATIONS["futsal"][g].values():
+                    if phone in users:
+                        await update.message.reply_text("❌ قبلاً در گروه دیگری ثبت‌نام کرده‌اید")
+                        return
+
+    # ظرفیت
     if len(registered) >= capacity:
         await update.message.reply_text("❌ ظرفیت تکمیل شده")
+        return
+
+    # ثبت‌نام تکراری
+    if phone in registered:
+        await update.message.reply_text("❌ شما قبلاً ثبت‌نام کرده‌اید")
         return
 
     # ثبت در RAM
