@@ -129,10 +129,9 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_input = update.message.text.strip()
     phone = normalize_phone(raw_input)
 
-    if not phone.startswith("09") or len(phone) != 11:
-        await update.message.reply_text("❌ شماره باید مثل 09123456789 باشد")
+    if not phone.isdigit() or len(phone) < 10:
+        await update.message.reply_text("❌ شماره نامعتبر است")
         return
-
 
     sport = context.user_data["sport"]
     idx = context.user_data["time_index"]
@@ -140,21 +139,11 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # گرفتن تایم از RAM
     if sport == "futsal":
-        if group not in RAM_TIMES["futsal"]:
-            await update.message.reply_text("❌ گروه نامعتبر است")
-            return
-        
-        if idx >= len(RAM_TIMES["futsal"][group]):
-            await update.message.reply_text("❌ این تایم وجود ندارد")
-            return
         slot = RAM_TIMES["futsal"][group][idx]
         if idx not in RAM_REGISTRATIONS["futsal"][group]:
             RAM_REGISTRATIONS["futsal"][group][idx] = {}
         registered = RAM_REGISTRATIONS["futsal"][group][idx]
     else:
-        if idx >= len(RAM_TIMES[sport]):
-            await update.message.reply_text("❌ این تایم وجود ندارد")
-            return
         slot = RAM_TIMES[sport][idx]
         if idx not in RAM_REGISTRATIONS[sport]:
             RAM_REGISTRATIONS[sport][idx] = {}
@@ -168,12 +157,10 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name = None
     
         # پیدا کردن بازیکن در گروه‌ها
-    for g in "ABCDEFGHIJ":
-        if phone in RAM_PLAYERS["futsal"][g]:
-            name = RAM_PLAYERS["futsal"][g][phone]
-            break
-
-
+        for g in "ABCDEFGHIJ":
+            if phone in RAM_PLAYERS["futsal"][g]:
+                name = RAM_PLAYERS["futsal"][g][phone]
+                break
     
         if not name:
             await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
@@ -352,25 +339,21 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data.split(":")
+
     sport = data[0]
 
     # فوتسال گروهی
     if sport == "futsal":
         group = data[1]
+        idx = int(data[2])
 
-        try:
-            idx = int(data[2])
-        except:
-            await query.edit_message_text("❌ خطا در انتخاب تایم")
-            return
-
-        # ✅ اینجا بیرون except قرار گرفت
         context.user_data["sport"] = "futsal"
         context.user_data["group"] = group
         context.user_data["time_index"] = idx
 
     else:
         idx = int(data[1])
+
         context.user_data["sport"] = sport
         context.user_data["time_index"] = idx
 
