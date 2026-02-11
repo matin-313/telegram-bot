@@ -35,23 +35,47 @@ REPORT_TIME = time(23, 59)
 # ======================================================
 # IN-MEMORY GROUP LISTS
 # ======================================================
-
 FUTSAL_GROUPS = {chr(i): set() for i in range(ord("A"), ord("K"))}  # A تا J
+
 
 # ======================================================
 # RAM PLAYERS (بازیکن‌ها فقط در حافظه)
 # ======================================================
-
 RAM_PLAYERS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},   # group -> {phone: name}
     "basketball": {},                         # phone -> name
     "volleyball": {}                          # phone -> name
 }
 
+# ✅ این مقداردهی اولیه را در ابتدای main() اضافه کن
+def initialize_ram():
+    """مقداردهی اولیه ساختارهای RAM"""
+    global RAM_PLAYERS, RAM_TIMES, RAM_REGISTRATIONS
+    
+    # بازیکنان
+    RAM_PLAYERS = {
+        "futsal": {g: {} for g in "ABCDEFGHIJ"},
+        "basketball": {},
+        "volleyball": {}
+    }
+    
+    # تایم‌ها
+    RAM_TIMES = {
+        "futsal": {g: [] for g in "ABCDEFGHIJ"},
+        "basketball": [],
+        "volleyball": []
+    }
+    
+    # ثبت‌نام‌ها
+    RAM_REGISTRATIONS = {
+        "futsal": {g: {} for g in "ABCDEFGHIJ"},
+        "basketball": {},
+        "volleyball": {}
+    }
+
 # ======================================================
 # RAM REGISTRATIONS (ثبت نام فقط در حافظه)
 # ======================================================
-
 RAM_REGISTRATIONS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},  # group -> {time_id: {phone: name}}
     "basketball": {},  # time_id -> {phone: name}
@@ -61,7 +85,6 @@ RAM_REGISTRATIONS = {
 # ======================================================
 # RAM TIMES (تایم‌ها فقط در حافظه)
 # ======================================================
-
 RAM_TIMES = {
     "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times
     "basketball": [],
@@ -131,11 +154,18 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sport = context.user_data["sport"]
     idx = context.user_data["time_index"]
-    group = context.user_data.get("group")  # فقط فوتسال
+    group = context.user_data.get("group")
 
     # ─────────── phone normalize ───────────
     raw_phone = update.message.text.strip()
     phone = normalize_phone(raw_phone)
+    
+    # ✅ لاگ برای دیباگ
+    print(f"\n🟢 تلاش برای ثبت‌نام:")
+    print(f"   ورزش: {sport}")
+    print(f"   گروه: {group}")
+    print(f"   شماره وارد شده: {raw_phone}")
+    print(f"   شماره نرمالایز شده: {phone}")
 
     if not phone.startswith("09") or len(phone) != 11:
         await update.message.reply_text("❌ شماره نامعتبر است\nمثال: 09123456789")
@@ -156,7 +186,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         slot = RAM_TIMES["futsal"][group][idx]
         registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(idx, {})
 
-    else:  # بسکتبال و والیبال
+    else:
         if idx >= len(RAM_TIMES[sport]):
             await update.message.reply_text("❌ تایم نامعتبر است")
             context.user_data.clear()
@@ -167,34 +197,43 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     capacity = slot.get("cap", 0)
 
-    # ─────────── ✅ بخش اصلاح شده: بررسی بازیکن ───────────
+    # ─────────── بررسی بازیکن ───────────
     if sport == "futsal":
         # فوتسال: بررسی در گروه‌ها
         found_player = False
         found_name = None
         found_group = None
         
-        # 1️⃣ اول در همان گروه جستجو کن
+        # ✅ لاگ برای دیدن محتوای RAM_PLAYERS فوتسال
+        print(f"   بررسی فوتسال - گروه هدف: {group}")
+        for g in "ABCDEFGHIJ":
+            if RAM_PLAYERS["futsal"][g]:
+                print(f"     گروه {g}: {list(RAM_PLAYERS['futsal'][g].keys())}")
+        
+        # اول در همان گروه جستجو کن
         if phone in RAM_PLAYERS["futsal"][group]:
             found_player = True
             found_name = RAM_PLAYERS["futsal"][group][phone]
             found_group = group
+            print(f"   ✅ بازیکن در گروه {group} پیدا شد: {found_name}")
         
-        # 2️⃣ اگر در همان گروه نبود، بقیه گروه‌ها رو چک کن
+        # اگر در همان گروه نبود، بقیه گروه‌ها رو چک کن
         else:
             for g in "ABCDEFGHIJ":
                 if phone in RAM_PLAYERS["futsal"][g]:
                     found_player = True
                     found_name = RAM_PLAYERS["futsal"][g][phone]
                     found_group = g
+                    print(f"   ⚠️ بازیکن در گروه {g} پیدا شد (نه گروه هدف)")
                     break
         
-        # 3️⃣ اگر اصلاً پیدا نشد
+        # اگر اصلاً پیدا نشد
         if not found_player:
+            print(f"   ❌ بازیکن با شماره {phone} در هیچ گروه فوتسال پیدا نشد")
             await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
             return
         
-        # 4️⃣ اگر در گروه دیگری بود
+        # اگر در گروه دیگری بود
         if found_group != group:
             await update.message.reply_text(
                 f"❌ شما عضو گروه {found_group} هستید و نمی‌توانید در گروه {group} ثبت‌نام کنید"
@@ -204,18 +243,30 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         player_name = found_name
 
     else:  # بسکتبال و والیبال
-        # ✅ جستجوی مستقیم در دیکشنری رشته مربوطه
+        # ✅ لاگ برای دیدن محتوای RAM_PLAYERS
+        print(f"   بررسی {sport} - محتوای RAM_PLAYERS[{sport}]: {RAM_PLAYERS.get(sport, {})}")
+        print(f"   جستجوی شماره: {phone}")
+        
+        # اطمینان از وجود دیکشنری
+        if RAM_PLAYERS.get(sport) is None:
+            RAM_PLAYERS[sport] = {}
+            print(f"   ⚠️ RAM_PLAYERS[{sport}] None بود، مقداردهی شد")
+        
         player_name = RAM_PLAYERS[sport].get(phone)
         
         if not player_name:
-            # نام فارسی رشته برای نمایش
             sport_name = {
                 "basketball": "بسکتبال",
                 "volleyball": "والیبال"
             }.get(sport, sport)
             
+            print(f"   ❌ بازیکن با شماره {phone} در لیست {sport_name} پیدا نشد")
+            print(f"   شماره‌های موجود: {list(RAM_PLAYERS[sport].keys())}")
+            
             await update.message.reply_text(f"❌ شما در لیست {sport_name} نیستید")
             return
+        
+        print(f"   ✅ بازیکن پیدا شد: {player_name}")
 
     # ─────────── بررسی تکراری بودن ───────────
     if phone in registrations:
@@ -229,6 +280,8 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ─────────── ذخیره نهایی ───────────
     registrations[phone] = player_name
+    
+    print(f"✅ ثبت‌نام موفق: {player_name} - {phone} در {sport}")
 
     # ─────────── پیام موفقیت ───────────
     sport_name = {
@@ -246,7 +299,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏰ {slot['start']} - {slot['end']}"
     )
 
-    # ─────────── پاک کردن حافظه موقت ───────────
     context.user_data.clear()
 
 
@@ -420,19 +472,30 @@ async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         name, phone = context.args
-        phone = normalize_phone(phone)  # ✅ نرمالایز شماره قبل از ذخیره
+        phone = normalize_phone(phone)
+        
+        # ✅ لاگ برای دیباگ
+        print(f"🟡 افزودن بازیکن بسکتبال: {name} - {phone}")
+        print(f"   RAM_PLAYERS[basketball] قبل: {RAM_PLAYERS['basketball']}")
 
+        # مقداردهی مجدد اگر None یا تعریف نشده باشد
+        if RAM_PLAYERS.get("basketball") is None:
+            RAM_PLAYERS["basketball"] = {}
+            
         if phone in RAM_PLAYERS["basketball"]:
             await update.message.reply_text("❌ قبلاً ثبت شده")
             return
 
-        RAM_PLAYERS["basketball"][phone] = name  # ✅ ذخیره با شماره نرمالایز شده
+        RAM_PLAYERS["basketball"][phone] = name
+        
+        # ✅ لاگ بعد از ذخیره
+        print(f"   RAM_PLAYERS[basketball] بعد: {RAM_PLAYERS['basketball']}")
+        print(f"✅ بازیکن بسکتبال اضافه شد: {phone} -> {name}")
 
         await update.message.reply_text(f"✅ بازیکن بسکتبال اضافه شد:\n👤 {name}\n📱 {phone}")
-    except ValueError:
-        await update.message.reply_text("❌ فرمت: /add_basketball نام 09123456789")
     except Exception as e:
-        await update.message.reply_text(f"❌ خطا: {str(e)}")
+        print(f"❌ خطا در add_basketball: {e}")
+        await update.message.reply_text("❌ فرمت: /add_basketball نام 09123456789")
 
 
 
@@ -442,19 +505,30 @@ async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         name, phone = context.args
-        phone = normalize_phone(phone)  # ✅ نرمالایز شماره قبل از ذخیره
+        phone = normalize_phone(phone)
+        
+        # ✅ لاگ برای دیباگ
+        print(f"🟡 افزودن بازیکن والیبال: {name} - {phone}")
+        print(f"   RAM_PLAYERS[volleyball] قبل: {RAM_PLAYERS['volleyball']}")
 
+        # مقداردهی مجدد اگر None یا تعریف نشده باشد
+        if RAM_PLAYERS.get("volleyball") is None:
+            RAM_PLAYERS["volleyball"] = {}
+            
         if phone in RAM_PLAYERS["volleyball"]:
             await update.message.reply_text("❌ قبلاً ثبت شده")
             return
 
-        RAM_PLAYERS["volleyball"][phone] = name  # ✅ ذخیره با شماره نرمالایز شده
+        RAM_PLAYERS["volleyball"][phone] = name
+        
+        # ✅ لاگ بعد از ذخیره
+        print(f"   RAM_PLAYERS[volleyball] بعد: {RAM_PLAYERS['volleyball']}")
+        print(f"✅ بازیکن والیبال اضافه شد: {phone} -> {name}")
 
         await update.message.reply_text(f"✅ بازیکن والیبال اضافه شد:\n👤 {name}\n📱 {phone}")
-    except ValueError:
-        await update.message.reply_text("❌ فرمت: /add_volleyball نام 09123456789")
     except Exception as e:
-        await update.message.reply_text(f"❌ خطا: {str(e)}")
+        print(f"❌ خطا در add_volleyball: {e}")
+        await update.message.reply_text("❌ فرمت: /add_volleyball نام 09123456789")
 
 
 
@@ -508,7 +582,14 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
 
     try:
         name, phone = context.args
-        phone = normalize_phone(phone)  # ✅ اول نرمالایز کن
+        phone = normalize_phone(phone)
+        
+        # ✅ لاگ برای دیباگ
+        print(f"🟡 افزودن بازیکن فوتسال گروه {group}: {name} - {phone}")
+
+        # اطمینان از وجود ساختار
+        if group not in RAM_PLAYERS["futsal"]:
+            RAM_PLAYERS["futsal"][group] = {}
 
         # اگر در همین گروه بود
         if phone in RAM_PLAYERS["futsal"][group]:
@@ -525,12 +606,15 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
 
         # ذخیره با شماره نرمالایز شده
         RAM_PLAYERS["futsal"][group][phone] = name
+        
+        print(f"✅ بازیکن فوتسال اضافه شد: گروه {group}, {phone} -> {name}")
 
         await update.message.reply_text(
             f"✅ بازیکن {name} به گروه فوتسال {group} اضافه شد"
         )
 
-    except:
+    except Exception as e:
+        print(f"❌ خطا در add_group_player: {e}")
         await update.message.reply_text(
             f"❌ فرمت:\n/add{group}player نام 09123456789"
         )
@@ -567,6 +651,26 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
 # MAIN
 # ======================================================
 def main():
+    # ✅ مقداردهی اولیه ساختارها
+    global RAM_PLAYERS, RAM_TIMES, RAM_REGISTRATIONS
+    
+    RAM_PLAYERS = {
+        "futsal": {g: {} for g in "ABCDEFGHIJ"},
+        "basketball": {},
+        "volleyball": {}
+    }
+    
+    RAM_TIMES = {
+        "futsal": {g: [] for g in "ABCDEFGHIJ"},
+        "basketball": [],
+        "volleyball": []
+    }
+    
+    RAM_REGISTRATIONS = {
+        "futsal": {g: {} for g in "ABCDEFGHIJ"},
+        "basketball": {},
+        "volleyball": {}
+    }
     
     # ساخت اپلیکیشن
     app = ApplicationBuilder().token(BOT_TOKEN).build()
