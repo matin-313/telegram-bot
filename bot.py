@@ -238,6 +238,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         slot = RAM_TIMES["futsal"][group][idx]
+        time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(idx, {})
 
     elif sport == "shared":
@@ -248,6 +249,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         slot = RAM_TIMES["shared"][idx]
+        time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS["shared"].setdefault(idx, {})
 
     else:  # بسکتبال و والیبال
@@ -257,6 +259,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         slot = RAM_TIMES[sport][idx]
+        time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS[sport].setdefault(idx, {})
 
     capacity = slot.get("cap", 0)
