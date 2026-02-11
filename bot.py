@@ -129,6 +129,20 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_input = update.message.text.strip()
     phone = normalize_phone(raw_input)
 
+    required_keys = ["sport", "time_index"]
+    
+    if not all(k in context.user_data for k in required_keys):
+        await update.message.reply_text("❌ لطفاً دوباره از ابتدا رشته و تایم را انتخاب کنید")
+        context.user_data.clear()
+        return
+
+    if context.user_data["sport"] == "futsal" and "group" not in context.user_data:
+        await update.message.reply_text("❌ خطا در گروه فوتسال، لطفاً دوباره انتخاب کنید")
+        context.user_data.clear()
+        return
+
+
+
     if not phone.startswith("09") or len(phone) != 11:
         await update.message.reply_text("❌ شماره باید مثل 09123456789 باشد")
         return
@@ -314,7 +328,6 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     sport = sport_map[text]
-    context.user_data.clear()
     context.user_data["sport"] = sport
 
     keyboard = []
