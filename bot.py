@@ -215,7 +215,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_phone = update.message.text.strip()
     phone = normalize_phone(raw_phone)
     
-    # ✅ لاگ برای دیباگ
     print(f"\n🟢 تلاش برای ثبت‌نام:")
     print(f"   ورزش: {sport}")
     print(f"   گروه: {group}")
@@ -241,8 +240,73 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         slot = RAM_TIMES["futsal"][group][idx]
         registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(idx, {})
 
+    elif sport == "shared":
+        # ✅ بخش اشتراکی - validation
+        if idx >= len(RAM_TIMES["shared"]):
+            await update.message.reply_text("❌ تایم اشتراکی نامعتبر است")
+            context.user_data.clear()
+            return
+
+        slot = RAM_TIMES["shared"][idx]
+        registrations = RAM_REGISTRATIONS["shared"].setdefault(idx, {})
+
+    else:  # بسکتبال و والیبال
+        if idx >= len(RAM_TIMES[sport]):
+            await update.message.reply_text("❌ تایم نامعتبر است")
+            context.user_data.clear()
+            return
+
+        slot = RAM_TIMES[sport][idx]
+        registrations = RAM_REGISTRATIONS[sport].setdefault(idx, {})
+
+    capacity = slot.get("cap", 0)
+
+    # ─────────── بررسی بازیکن ───────────
+    if sport == "futsal":
+        # فوتسال: بررسی در گروه‌ها
+        found_player = False
+        found_name = None
+        found_group = None
+        
+        print(f"   بررسی فوتسال - گروه هدف: {group}")
+        for g in "ABCDEFGHIJ":
+            if RAM_PLAYERS["futsal"][g]:
+                print(f"     گروه {g}: {list(RAM_PLAYERS['futsal'][g].keys())}")
+        
+        # اول در همان گروه جستجو کن
+        if phone in RAM_PLAYERS["futsal"][group]:
+            found_player = True
+            found_name = RAM_PLAYERS["futsal"][group][phone]
+            found_group = group
+            print(f"   ✅ بازیکن در گروه {group} پیدا شد: {found_name}")
+        
+        # اگر در همان گروه نبود، بقیه گروه‌ها رو چک کن
+        else:
+            for g in "ABCDEFGHIJ":
+                if phone in RAM_PLAYERS["futsal"][g]:
+                    found_player = True
+                    found_name = RAM_PLAYERS["futsal"][g][phone]
+                    found_group = g
+                    print(f"   ⚠️ بازیکن در گروه {g} پیدا شد (نه گروه هدف)")
+                    break
+        
+        # اگر اصلاً پیدا نشد
+        if not found_player:
+            print(f"   ❌ بازیکن با شماره {phone} در هیچ گروه فوتسال پیدا نشد")
+            await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
+            return
+        
+        # اگر در گروه دیگری بود
+        if found_group != group:
+            await update.message.reply_text(
+                f"❌ شما عضو گروه {found_group} هستید و نمی‌توانید در گروه {group} ثبت‌نام کنید"
+            )
+            return
+        
+        player_name = found_name
+
     elif sport == "shared": 
-        # بخش اشتراکی - دسترسی آزاد
+        # ✅ بخش اشتراکی - دسترسی آزاد
         print(f"   بررسی اشتراکی - دسترسی آزاد")
         
         found_in_any = False
@@ -283,71 +347,12 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if phone not in RAM_PLAYERS["shared"]:
             RAM_PLAYERS["shared"][phone] = player_name
 
-    else:
-        if idx >= len(RAM_TIMES[sport]):
-            await update.message.reply_text("❌ تایم نامعتبر است")
-            context.user_data.clear()
-            return
-
-        slot = RAM_TIMES[sport][idx]
-        registrations = RAM_REGISTRATIONS[sport].setdefault(idx, {})
-
-    capacity = slot.get("cap", 0)
-
-    # ─────────── بررسی بازیکن ───────────
-    if sport == "futsal":
-        # فوتسال: بررسی در گروه‌ها
-        found_player = False
-        found_name = None
-        found_group = None
-        
-        # ✅ لاگ برای دیدن محتوای RAM_PLAYERS فوتسال
-        print(f"   بررسی فوتسال - گروه هدف: {group}")
-        for g in "ABCDEFGHIJ":
-            if RAM_PLAYERS["futsal"][g]:
-                print(f"     گروه {g}: {list(RAM_PLAYERS['futsal'][g].keys())}")
-        
-        # اول در همان گروه جستجو کن
-        if phone in RAM_PLAYERS["futsal"][group]:
-            found_player = True
-            found_name = RAM_PLAYERS["futsal"][group][phone]
-            found_group = group
-            print(f"   ✅ بازیکن در گروه {group} پیدا شد: {found_name}")
-        
-        # اگر در همان گروه نبود، بقیه گروه‌ها رو چک کن
-        else:
-            for g in "ABCDEFGHIJ":
-                if phone in RAM_PLAYERS["futsal"][g]:
-                    found_player = True
-                    found_name = RAM_PLAYERS["futsal"][g][phone]
-                    found_group = g
-                    print(f"   ⚠️ بازیکن در گروه {g} پیدا شد (نه گروه هدف)")
-                    break
-        
-        # اگر اصلاً پیدا نشد
-        if not found_player:
-            print(f"   ❌ بازیکن با شماره {phone} در هیچ گروه فوتسال پیدا نشد")
-            await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
-            return
-        
-        # اگر در گروه دیگری بود
-        if found_group != group:
-            await update.message.reply_text(
-                f"❌ شما عضو گروه {found_group} هستید و نمی‌توانید در گروه {group} ثبت‌نام کنید"
-            )
-            return
-        
-        player_name = found_name
-
     else:  # بسکتبال و والیبال
-        # ✅ لاگ برای دیدن محتوای RAM_PLAYERS
         print(f"   بررسی {sport} - محتوای RAM_PLAYERS[{sport}]: {RAM_PLAYERS.get(sport, {})}")
         print(f"   جستجوی شماره: {phone}")
         
-        # اطمینان از وجود دیکشنری
         if RAM_PLAYERS.get(sport) is None:
             RAM_PLAYERS[sport] = {}
-            print(f"   ⚠️ RAM_PLAYERS[{sport}] None بود، مقداردهی شد")
         
         player_name = RAM_PLAYERS[sport].get(phone)
         
@@ -385,7 +390,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "futsal": "فوتسال",
         "basketball": "بسکتبال",
         "volleyball": "والیبال",
-        "shared": "اشتراکی"    
+        "shared": "اشتراکی"
     }.get(sport, sport)
     
     group_text = f" گروه {group}" if sport == "futsal" else ""
