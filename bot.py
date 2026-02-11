@@ -933,6 +933,380 @@ async def show_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text or "هیچ بازیکنی ثبت نشده")
 
 
+
+async def remove_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
+    """حذف بازیکن از گروه فوتسال با شماره تلفن"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                f"❌ فرمت:\n"
+                f"/remove{group}player 09123456789\n"
+                f"مثال: /remove{group}player 09123456789"
+            )
+            return
+
+        phone = normalize_phone(context.args[0])
+        
+        # بررسی وجود بازیکن در گروه
+        if phone not in RAM_PLAYERS["futsal"][group]:
+            await update.message.reply_text(
+                f"❌ این شماره در گروه {group} وجود ندارد"
+            )
+            return
+
+        # ذخیره نام قبل از حذف
+        player_name = RAM_PLAYERS["futsal"][group][phone]
+        
+        # حذف بازیکن
+        del RAM_PLAYERS["futsal"][group][phone]
+        
+        await update.message.reply_text(
+            f"✅ بازیکن از گروه {group} حذف شد:\n"
+            f"👤 {player_name}\n"
+            f"📱 {phone}"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_group_player: {e}")
+        await update.message.reply_text(
+            f"❌ خطا در حذف بازیکن\n"
+            f"فرمت: /remove{group}player 09123456789"
+        )
+
+
+
+async def remove_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف بازیکن بسکتبال با شماره تلفن"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_basketball 09123456789\n"
+                "مثال: /remove_basketball 09123456789"
+            )
+            return
+
+        phone = normalize_phone(context.args[0])
+        
+        # بررسی وجود بازیکن
+        if phone not in RAM_PLAYERS["basketball"]:
+            await update.message.reply_text(
+                "❌ این شماره در لیست بسکتبال وجود ندارد"
+            )
+            return
+
+        # ذخیره نام قبل از حذف
+        player_name = RAM_PLAYERS["basketball"][phone]
+        
+        # حذف بازیکن
+        del RAM_PLAYERS["basketball"][phone]
+        
+        await update.message.reply_text(
+            f"✅ بازیکن بسکتبال حذف شد:\n"
+            f"👤 {player_name}\n"
+            f"📱 {phone}"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_basketball: {e}")
+        await update.message.reply_text(
+            "❌ خطا در حذف بازیکن\n"
+            "فرمت: /remove_basketball 09123456789"
+        )
+
+
+
+async def remove_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف بازیکن والیبال با شماره تلفن"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_volleyball 09123456789\n"
+                "مثال: /remove_volleyball 09123456789"
+            )
+            return
+
+        phone = normalize_phone(context.args[0])
+        
+        # بررسی وجود بازیکن
+        if phone not in RAM_PLAYERS["volleyball"]:
+            await update.message.reply_text(
+                "❌ این شماره در لیست والیبال وجود ندارد"
+            )
+            return
+
+        # ذخیره نام قبل از حذف
+        player_name = RAM_PLAYERS["volleyball"][phone]
+        
+        # حذف بازیکن
+        del RAM_PLAYERS["volleyball"][phone]
+        
+        await update.message.reply_text(
+            f"✅ بازیکن والیبال حذف شد:\n"
+            f"👤 {player_name}\n"
+            f"📱 {phone}"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_volleyball: {e}")
+        await update.message.reply_text(
+            "❌ خطا در حذف بازیکن\n"
+            "فرمت: /remove_volleyball 09123456789"
+        )
+
+
+
+async def remove_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
+    """حذف تایم از گروه فوتسال با شماره ایندکس"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                f"❌ فرمت:\n"
+                f"/remove{group}time ایندکس\n"
+                f"برای دیدن ایندکس‌ها از /show_times استفاده کنید"
+            )
+            return
+
+        try:
+            idx = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("❌ ایندکس باید عدد باشد")
+            return
+
+        # بررسی وجود تایم
+        if idx >= len(RAM_TIMES["futsal"][group]) or idx < 0:
+            await update.message.reply_text(
+                f"❌ تایم با ایندکس {idx} در گروه {group} وجود ندارد"
+            )
+            return
+
+        # ذخیره اطلاعات تایم قبل از حذف
+        time_info = RAM_TIMES["futsal"][group][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        # حذف ثبت‌نام‌های مربوط به این تایم
+        time_key = f"time_{idx}"
+        if time_key in RAM_REGISTRATIONS["futsal"][group]:
+            del RAM_REGISTRATIONS["futsal"][group][time_key]
+        
+        # حذف تایم
+        del RAM_TIMES["futsal"][group][idx]
+        
+        # به‌روزرسانی کلیدهای ثبت‌نام‌ها (بعد از حذف، ایندکس‌ها تغییر می‌کنند)
+        await reindex_futsal_times(group)
+        
+        await update.message.reply_text(
+            f"✅ تایم از گروه {group} حذف شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {time_info['start']} - {time_info['end']}\n"
+            f"👥 ظرفیت: {time_info['cap']} نفر"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_group_time: {e}")
+        await update.message.reply_text(
+            f"❌ خطا در حذف تایم\n"
+            f"فرمت: /remove{group}time ایندکس"
+        )
+
+async def reindex_futsal_times(group: str):
+    """به‌روزرسانی ایندکس ثبت‌نام‌ها بعد از حذف تایم"""
+    new_registrations = {}
+    for i, time in enumerate(RAM_TIMES["futsal"][group]):
+        old_key = f"time_{i}"  # کلید جدید
+        # اگه ثبت‌نامی برای این تایم جدید وجود داشت
+        for old_key_existing in list(RAM_REGISTRATIONS["futsal"][group].keys()):
+            if old_key_existing == f"time_{i}" or old_key_existing == i:
+                new_registrations[old_key] = RAM_REGISTRATIONS["futsal"][group][old_key_existing]
+                break
+    
+    RAM_REGISTRATIONS["futsal"][group] = new_registrations
+
+
+
+async def remove_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف تایم بسکتبال با شماره ایندکس"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_basketball_time ایندکس\n"
+                "برای دیدن ایندکس‌ها از /show_times استفاده کنید"
+            )
+            return
+
+        try:
+            idx = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("❌ ایندکس باید عدد باشد")
+            return
+
+        # بررسی وجود تایم
+        if idx >= len(RAM_TIMES["basketball"]) or idx < 0:
+            await update.message.reply_text(
+                f"❌ تایم با ایندکس {idx} در بسکتبال وجود ندارد"
+            )
+            return
+
+        # ذخیره اطلاعات تایم قبل از حذف
+        time_info = RAM_TIMES["basketball"][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        # حذف ثبت‌نام‌های مربوط به این تایم
+        time_key = f"time_{idx}"
+        if time_key in RAM_REGISTRATIONS["basketball"]:
+            del RAM_REGISTRATIONS["basketball"][time_key]
+        
+        # حذف تایم
+        del RAM_TIMES["basketball"][idx]
+        
+        # به‌روزرسانی کلیدهای ثبت‌نام‌ها
+        await reindex_sport_times("basketball")
+        
+        await update.message.reply_text(
+            f"✅ تایم بسکتبال حذف شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {time_info['start']} - {time_info['end']}\n"
+            f"👥 ظرفیت: {time_info['cap']} نفر"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_basketball_time: {e}")
+        await update.message.reply_text(
+            "❌ خطا در حذف تایم\n"
+            "فرمت: /remove_basketball_time ایندکس"
+        )
+
+
+async def remove_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف تایم والیبال با شماره ایندکس"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_volleyball_time ایندکس\n"
+                "برای دیدن ایندکس‌ها از /show_times استفاده کنید"
+            )
+            return
+
+        try:
+            idx = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("❌ ایندکس باید عدد باشد")
+            return
+
+        # بررسی وجود تایم
+        if idx >= len(RAM_TIMES["volleyball"]) or idx < 0:
+            await update.message.reply_text(
+                f"❌ تایم با ایندکس {idx} در والیبال وجود ندارد"
+            )
+            return
+
+        # ذخیره اطلاعات تایم قبل از حذف
+        time_info = RAM_TIMES["volleyball"][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        # حذف ثبت‌نام‌های مربوط به این تایم
+        time_key = f"time_{idx}"
+        if time_key in RAM_REGISTRATIONS["volleyball"]:
+            del RAM_REGISTRATIONS["volleyball"][time_key]
+        
+        # حذف تایم
+        del RAM_TIMES["volleyball"][idx]
+        
+        # به‌روزرسانی کلیدهای ثبت‌نام‌ها
+        await reindex_sport_times("volleyball")
+        
+        await update.message.reply_text(
+            f"✅ تایم والیبال حذف شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {time_info['start']} - {time_info['end']}\n"
+            f"👥 ظرفیت: {time_info['cap']} نفر"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_volleyball_time: {e}")
+        await update.message.reply_text(
+            "❌ خطا در حذف تایم\n"
+            "فرمت: /remove_volleyball_time ایندکس"
+        )
+
+
+async def reindex_sport_times(sport: str):
+    """به‌روزرسانی ایندکس ثبت‌نام‌ها بعد از حذف تایم در بسکتبال/والیبال"""
+    new_registrations = {}
+    for i, time in enumerate(RAM_TIMES[sport]):
+        new_key = f"time_{i}"
+        # اگه ثبت‌نامی برای این تایم جدید وجود داشت
+        for old_key in list(RAM_REGISTRATIONS[sport].keys()):
+            if old_key == f"time_{i}" or old_key == i:
+                new_registrations[new_key] = RAM_REGISTRATIONS[sport][old_key]
+                break
+    
+    RAM_REGISTRATIONS[sport] = new_registrations
+
+
+
+async def show_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش تمام تایم‌ها به همراه ایندکس برای حذف"""
+    if not is_super(update.effective_user.id):
+        return
+
+    text = "📋 لیست تایم‌ها:\n\n"
+
+    # فوتسال
+    for g in "ABCDEFGHIJ":
+        if RAM_TIMES["futsal"][g]:
+            text += f"⚽ فوتسال گروه {g}:\n"
+            for idx, t in enumerate(RAM_TIMES["futsal"][g]):
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                text += f"  [{idx}] {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']} (ظرفیت: {t['cap']})\n"
+            text += "\n"
+
+    # بسکتبال
+    if RAM_TIMES["basketball"]:
+        text += f"🏀 بسکتبال:\n"
+        for idx, t in enumerate(RAM_TIMES["basketball"]):
+            j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+            text += f"  [{idx}] {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']} (ظرفیت: {t['cap']})\n"
+        text += "\n"
+
+    # والیبال
+    if RAM_TIMES["volleyball"]:
+        text += f"🏐 والیبال:\n"
+        for idx, t in enumerate(RAM_TIMES["volleyball"]):
+            j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+            text += f"  [{idx}] {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']} (ظرفیت: {t['cap']})\n"
+
+    await update.message.reply_text(text or "هیچ تایمی وجود ندارد")
+
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -969,6 +1343,11 @@ def main():
     app.add_handler(CommandHandler("add_volleyball", add_volleyball))
     app.add_handler(CommandHandler("add_basketball_time", add_basketball_time))
     app.add_handler(CommandHandler("add_volleyball_time", add_volleyball_time))
+    app.add_handler(CommandHandler("remove_basketball", remove_basketball))
+    app.add_handler(CommandHandler("remove_volleyball", remove_volleyball))
+    app.add_handler(CommandHandler("remove_basketball_time", remove_basketball_time))
+    app.add_handler(CommandHandler("remove_volleyball_time", remove_volleyball_time))
+    app.add_handler(CommandHandler("show_times", show_times))
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
 
