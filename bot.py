@@ -1730,7 +1730,7 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
         else:
             text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
         
-        keyboard = [[InlineKeyboardButton("🔙 بازگشت به تایم‌ها", callback_data="view_futsal")]]
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت به تایم‌ها", callback_data="view_futsal")]] 
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
     
     elif parts[0] == "view_basketball":
@@ -1925,11 +1925,13 @@ def main():
         view_registrations_sports
     ))
     
+    # ✅ هندلر نمایش ثبت‌نام‌کنندگان
+    app.add_handler(CallbackQueryHandler(view_time_registrations, pattern="^view_futsal:|^view_basketball:|^view_volleyball:|^view_shared:")) 
+    
     # ✅ هندلرهای نمایش تایم‌ها برای مشاهده
     app.add_handler(CallbackQueryHandler(view_sport_times, pattern="^view_"))
     
-    # ✅ هندلر نمایش ثبت‌نام‌کنندگان
-    app.add_handler(CallbackQueryHandler(view_time_registrations, pattern="^view_futsal:|^view_basketball:|^view_volleyball:|^view_shared:"))
+
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
