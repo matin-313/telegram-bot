@@ -566,9 +566,10 @@ def main():
 
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
+        filters.TEXT & filters.Regex(r"^09\d{9}$"),
         register
     ))
+
 
 
 
