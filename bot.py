@@ -1366,6 +1366,20 @@ def main():
         )
 
 
+        app.add_handler(
+            CommandHandler(
+                f"remove{group}player",
+                lambda update, context, g=group: remove_group_player(update, context, g)
+            )
+        )
+        app.add_handler(
+            CommandHandler(
+                f"remove{group}time",
+                lambda update, context, g=group: remove_group_time(update, context, g)
+            )
+        )
+    
+
     # 1️⃣ انتخاب رشته با دکمه‌های پایین
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^(⚽ فوتسال|🏀 بسکتبال|🏐 والیبال)$"),
