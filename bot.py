@@ -46,6 +46,8 @@ RAM_PLAYERS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},   # group -> {phone: name}
     "basketball": {},                         # phone -> name
     "volleyball": {}                          # phone -> name
+    "shared": {}                             # ✅ این خط رو اضافه کن
+
 }
 
 # ✅ این مقداردهی اولیه را در ابتدای main() اضافه کن
@@ -81,6 +83,8 @@ RAM_REGISTRATIONS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},  # group -> {time_id: {phone: name}}
     "basketball": {},  # time_id -> {phone: name}
     "volleyball": {}   # time_id -> {phone: name}
+    "shared": {}                             # ✅ این خط رو اضافه کن
+
 }
 
 # ======================================================
@@ -91,6 +95,8 @@ RAM_TIMES = {
     "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times with date
     "basketball": [],
     "volleyball": []
+    "shared": {}                             # ✅ این خط رو اضافه کن
+
 }
 
 # هر تایم به این شکل ذخیره میشه:
@@ -175,7 +181,8 @@ def is_time_expired(time_dict):
 # ======================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"]
+        ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
+        ["🤝 اشتراکی"]
     ]
 
     await update.message.reply_text(
@@ -230,6 +237,48 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         slot = RAM_TIMES["futsal"][group][idx]
         registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(idx, {})
+
+    elif sport == "shared": 
+        # بخش اشتراکی - دسترسی آزاد
+        print(f"   بررسی اشتراکی - دسترسی آزاد")
+        
+        found_in_any = False
+        player_name = None
+        
+        # چک کردن بسکتبال
+        if phone in RAM_PLAYERS["basketball"]:
+            found_in_any = True
+            player_name = RAM_PLAYERS["basketball"][phone]
+            print(f"   ✅ بازیکن در بسکتبال پیدا شد: {player_name}")
+        
+        # چک کردن والیبال
+        elif phone in RAM_PLAYERS["volleyball"]:
+            found_in_any = True
+            player_name = RAM_PLAYERS["volleyball"][phone]
+            print(f"   ✅ بازیکن در والیبال پیدا شد: {player_name}")
+        
+        # چک کردن فوتسال (همه گروه‌ها)
+        else:
+            for g in "ABCDEFGHIJ":
+                if phone in RAM_PLAYERS["futsal"][g]:
+                    found_in_any = True
+                    player_name = RAM_PLAYERS["futsal"][g][phone]
+                    print(f"   ✅ بازیکن در فوتسال گروه {g} پیدا شد: {player_name}")
+                    break
+        
+        if not found_in_any:
+            print(f"   ❌ بازیکن با شماره {phone} در هیچ رشته‌ای پیدا نشد")
+            await update.message.reply_text(
+                "❌ شما در هیچ رشته‌ای ثبت نام نکرده‌اید\n"
+                "برای ثبت‌نام در تایم‌های اشتراکی، باید حداقل در یکی از رشته‌ها عضو باشید"
+            )
+            return
+        
+        # ذخیره در لیست اشتراکی
+        if RAM_PLAYERS.get("shared") is None:
+            RAM_PLAYERS["shared"] = {}
+        if phone not in RAM_PLAYERS["shared"]:
+            RAM_PLAYERS["shared"][phone] = player_name
 
     else:
         if idx >= len(RAM_TIMES[sport]):
@@ -332,7 +381,8 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sport_name = {
         "futsal": "فوتسال",
         "basketball": "بسکتبال",
-        "volleyball": "والیبال"
+        "volleyball": "والیبال",
+        "shared": "اشتراکی"    
     }.get(sport, sport)
     
     group_text = f" گروه {group}" if sport == "futsal" else ""
@@ -456,7 +506,8 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sport_map = {
         "⚽ فوتسال": "futsal",
         "🏀 بسکتبال": "basketball",
-        "🏐 والیبال": "volleyball"
+        "🏐 والیبال": "volleyball",
+        "🤝 اشتراکی": "shared"  
     }
 
     if text not in sport_map:
@@ -494,7 +545,12 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         for idx, t in enumerate(active_times):
             j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
-            label = f"{j_date.strftime('%Y/%m/%d')} - {t['start']} - {t['end']}"
+            
+            if sport == "shared":
+                label = f"{j_date.strftime('%Y/%m/%d')} - {t['start']} - {t['end']} (ظرفیت: {t['cap']}) 🤝"
+            else:
+                label = f"{j_date.strftime('%Y/%m/%d')} - {t['start']} - {t['end']}"
+
             keyboard.append([
                 InlineKeyboardButton(label, callback_data=f"{sport}:{idx}")
             ])
@@ -538,6 +594,12 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         idx = int(data[1])
         context.user_data["sport"] = sport
         context.user_data["time_index"] = idx
+        
+        sport_name = {
+            "basketball": "بسکتبال",
+            "volleyball": "والیبال",
+            "shared": "اشتراکی"
+        }.get(sport, sport)
 
     await query.edit_message_text(
         "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
@@ -1257,6 +1319,114 @@ async def remove_volleyball_time(update: Update, context: ContextTypes.DEFAULT_T
         )
 
 
+# ======================================================
+# SHARED TIMES COMMANDS
+# ======================================================
+
+async def add_shared_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """افزودن تایم اشتراکی"""
+    if not is_super(update.effective_user.id):
+        return
+
+    try:
+        if len(context.args) != 4:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_shared_time تاریخ start end cap\n"
+                "مثال میلادی: /add_shared_time 2026-02-11 18:00 19:00 20\n"
+                "مثال شمسی: /add_shared_time 1404/11/23 18:00 19:00 20"
+            )
+            return
+
+        date_str, start, end, cap = context.args
+        date_obj = parse_date(date_str)
+        
+        if not date_obj:
+            await update.message.reply_text("❌ تاریخ نامعتبر است")
+            return
+            
+        if date_obj < date.today():
+            await update.message.reply_text("❌ این تاریخ گذشته است!")
+            return
+
+        RAM_TIMES["shared"].append({
+            "date": date_obj.isoformat(),
+            "date_obj": date_obj,
+            "start": start,
+            "end": end,
+            "cap": int(cap)
+        })
+
+        RAM_TIMES["shared"].sort(key=lambda x: x["date_obj"])
+        
+        j_date = jdatetime.date.fromgregorian(date=date_obj)
+        await update.message.reply_text(
+            f"✅ تایم اشتراکی اضافه شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {start} تا {end}\n"
+            f"👥 ظرفیت: {cap} نفر\n"
+            f"🤝 همه رشته‌ها می‌توانند ثبت‌نام کنند"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در add_shared_time: {e}")
+        await update.message.reply_text("❌ فرمت: /add_shared_time تاریخ start end cap")
+
+
+async def remove_shared_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف تایم اشتراکی با شماره ایندکس"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید")
+        return
+
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_shared_time ایندکس\n"
+                "برای دیدن ایندکس‌ها از /show_times استفاده کنید"
+            )
+            return
+
+        try:
+            idx = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("❌ ایندکس باید عدد باشد")
+            return
+
+        if idx >= len(RAM_TIMES["shared"]) or idx < 0:
+            await update.message.reply_text(
+                f"❌ تایم با ایندکس {idx} در بخش اشتراکی وجود ندارد"
+            )
+            return
+
+        time_info = RAM_TIMES["shared"][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        time_key = f"time_{idx}"
+        if time_key in RAM_REGISTRATIONS["shared"]:
+            del RAM_REGISTRATIONS["shared"][time_key]
+        
+        del RAM_TIMES["shared"][idx]
+        
+        await reindex_sport_times("shared")
+        
+        await update.message.reply_text(
+            f"✅ تایم اشتراکی حذف شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {time_info['start']} - {time_info['end']}\n"
+            f"👥 ظرفیت: {time_info['cap']} نفر"
+        )
+
+    except Exception as e:
+        print(f"❌ خطا در remove_shared_time: {e}")
+        await update.message.reply_text(
+            "❌ خطا در حذف تایم\n"
+            "فرمت: /remove_shared_time ایندکس"
+        )
+
+
+
 async def reindex_sport_times(sport: str):
     """به‌روزرسانی ایندکس ثبت‌نام‌ها بعد از حذف تایم در بسکتبال/والیبال"""
     new_registrations = {}
@@ -1302,9 +1472,17 @@ async def show_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, t in enumerate(RAM_TIMES["volleyball"]):
             j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
             text += f"  [{idx}] {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']} (ظرفیت: {t['cap']})\n"
+        text += "\n"
+
+    #share
+    if RAM_TIMES["shared"]:
+        text += f"🤝 اشتراکی:\n"
+        for idx, t in enumerate(RAM_TIMES["shared"]):
+            j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+            text += f"  [{idx}] {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']} (ظرفیت: {t['cap']})\n"
+    
 
     await update.message.reply_text(text or "هیچ تایمی وجود ندارد")
-
 
 
 # ======================================================
@@ -1317,19 +1495,25 @@ def main():
     RAM_PLAYERS = {
         "futsal": {g: {} for g in "ABCDEFGHIJ"},
         "basketball": {},
-        "volleyball": {}
+        "volleyball": {},
+        "shared": {}   
+
     }
     
     RAM_TIMES = {
         "futsal": {g: [] for g in "ABCDEFGHIJ"},
         "basketball": [],
-        "volleyball": []
+        "volleyball": [],
+        "shared": []  #   
+
     }
     
     RAM_REGISTRATIONS = {
         "futsal": {g: {} for g in "ABCDEFGHIJ"},
         "basketball": {},
-        "volleyball": {}
+        "volleyball": {},
+        "shared": {}    
+
     }
     
     # ساخت اپلیکیشن
@@ -1348,6 +1532,8 @@ def main():
     app.add_handler(CommandHandler("remove_basketball_time", remove_basketball_time))
     app.add_handler(CommandHandler("remove_volleyball_time", remove_volleyball_time))
     app.add_handler(CommandHandler("show_times", show_times))
+    app.add_handler(CommandHandler("add_shared_time", add_shared_time))
+    app.add_handler(CommandHandler("remove_shared_time", remove_shared_time))
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
 
@@ -1382,22 +1568,18 @@ def main():
 
     # 1️⃣ انتخاب رشته با دکمه‌های پایین
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^(⚽ فوتسال|🏀 بسکتبال|🏐 والیبال)$"),
+        filters.TEXT & filters.Regex("^(⚽ فوتسال|🏀 بسکتبال|🏐 والیبال|🤝 اشتراکی)$"),
         sport_text_select
     ))
     
     # 2️⃣ انتخاب تایم (دکمه شیشه‌ای)
-    app.add_handler(CallbackQueryHandler(time_select, pattern="^(futsal|basketball|volleyball):"))
+    app.add_handler(CallbackQueryHandler(time_select, pattern="^(futsal|basketball|volleyball|shared):"))
 
     # 3️⃣ وارد کردن شماره موبایل
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex(r"^09\d{9}$"),
         register
     ))
-
-
-
-
 
 
     # JobQueue برای گزارش شبانه
