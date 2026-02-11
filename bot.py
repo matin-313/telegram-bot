@@ -8,6 +8,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
 import logging
 from datetime import datetime, time
+from datetime import date, datetime, time, timedelta
+import jdatetime 
 from telegram import (
     Update,
     KeyboardButton,
@@ -20,7 +22,6 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
-
 # ======================================================
 # CONFIG
 # ======================================================
@@ -85,11 +86,21 @@ RAM_REGISTRATIONS = {
 # ======================================================
 # RAM TIMES (تایم‌ها فقط در حافظه)
 # ======================================================
+
 RAM_TIMES = {
-    "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times
+    "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times with date
     "basketball": [],
     "volleyball": []
 }
+
+# هر تایم به این شکل ذخیره میشه:
+# {
+#     "date": "2026-02-11",
+#     "start": "18:00",
+#     "end": "19:00", 
+#     "cap": 15,
+#     "date_obj": date(2026, 2, 11)  # برای مقایسه راحت‌تر
+# }
 
 
 # ======================================================
@@ -124,6 +135,40 @@ def normalize_phone(raw: str) -> str:
 # ======================================================
 def is_super(uid): return uid in SUPER_ADMINS
 def is_admin(uid): return uid in SUPER_ADMINS or uid in VIEWER_ADMINS
+
+
+# ======================================================
+# DATE UTILS
+# ======================================================
+def get_today_date():
+    """تاریخ امروز به میلادی"""
+    return date.today().isoformat()
+
+def get_today_jalali():
+    """تاریخ امروز به شمسی برای نمایش"""
+    return jdatetime.date.today().strftime("%Y/%m/%d")
+
+def parse_date(date_str):
+    """تبدیل رشته تاریخ به آبجکت date"""
+    try:
+        # تلاش برای فرمت میلادی
+        return datetime.strptime(date_str, "%Y-%m-%d").date()
+    except:
+        try:
+            # تلاش برای فرمت شمسی
+            j_date = jdatetime.datetime.strptime(date_str, "%Y/%m/%d").date()
+            return j_date.togregorian()
+        except:
+            return None
+
+def is_time_expired(time_dict):
+    """بررسی اینکه تایم منقضی شده یا نه"""
+    time_date = time_dict.get("date_obj")
+    if not time_date:
+        return True
+    
+    today = date.today()
+    return time_date < today  # اگر تاریخش گذشته باشه
 
 # ======================================================
 # START
@@ -365,18 +410,33 @@ async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # DAILY REPORT
 # ======================================================
 async def daily_report(context: ContextTypes.DEFAULT_TYPE):
+    # اول تایم‌های منقضی شده رو پاک کن
+    await cleanup_expired_times()
+    
+    # بعد گزارش بده
+    text = "📊 گزارش شبانه ثبت‌نام‌ها (RAM)\n"
+    text += f"📅 تاریخ: {get_today_jalali()}\n\n"
 
-    text = "📊 گزارش شبانه ثبت‌نام‌ها (RAM)\n\n"
-
+    # فوتسال
     for g in "ABCDEFGHIJ":
-        for time_id, users in RAM_REGISTRATIONS["futsal"][g].items():
-            text += f"⚽ فوتسال گروه {g} تایم {time_id}: {len(users)} نفر\n"
+        total = 0
+        for users in RAM_REGISTRATIONS["futsal"][g].values():
+            total += len(users)
+        if total > 0:
+            text += f"⚽ فوتسال گروه {g}: {total} نفر\n"
 
-    for time_id, users in RAM_REGISTRATIONS["basketball"].items():
-        text += f"🏀 بسکتبال تایم {time_id}: {len(users)} نفر\n"
+    # بسکتبال
+    total_basketball = sum(len(users) for users in RAM_REGISTRATIONS["basketball"].values())
+    if total_basketball > 0:
+        text += f"🏀 بسکتبال: {total_basketball} نفر\n"
 
-    for time_id, users in RAM_REGISTRATIONS["volleyball"].items():
-        text += f"🏐 والیبال تایم {time_id}: {len(users)} نفر\n"
+    # والیبال
+    total_volleyball = sum(len(users) for users in RAM_REGISTRATIONS["volleyball"].values())
+    if total_volleyball > 0:
+        text += f"🏐 والیبال: {total_volleyball} نفر\n"
+
+    if text == f"📊 گزارش شبانه ثبت‌نام‌ها (RAM)\n📅 تاریخ: {get_today_jalali()}\n\n":
+        text += "📭 هیچ ثبت‌نامی وجود ندارد"
 
     for admin in SUPER_ADMINS + VIEWER_ADMINS:
         await context.bot.send_message(admin, text)
@@ -402,19 +462,35 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["sport"] = sport
 
     keyboard = []
+    today = date.today()
 
     # فوتسال گروهی
     if sport == "futsal":
         for g in "ABCDEFGHIJ":
-            for idx, t in enumerate(RAM_TIMES["futsal"][g]):
-                label = f"{t['start']} - {t['end']} | گروه {g}"
+            # فقط تایم‌های امروز و آینده رو نشون بده
+            active_times = []
+            for t in RAM_TIMES["futsal"][g]:
+                if not is_time_expired(t):
+                    active_times.append(t)
+            
+            for idx, t in enumerate(active_times):
+                # تاریخ شمسی
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                label = f"{j_date.strftime('%Y/%m/%d')} - {t['start']} - {t['end']} | گروه {g}"
                 keyboard.append([
                     InlineKeyboardButton(label, callback_data=f"futsal:{g}:{idx}")
                 ])
 
     else:
-        for idx, t in enumerate(RAM_TIMES[sport]):
-            label = f"{t['start']} - {t['end']}"
+        # فقط تایم‌های امروز و آینده
+        active_times = []
+        for t in RAM_TIMES[sport]:
+            if not is_time_expired(t):
+                active_times.append(t)
+        
+        for idx, t in enumerate(active_times):
+            j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+            label = f"{j_date.strftime('%Y/%m/%d')} - {t['start']} - {t['end']}"
             keyboard.append([
                 InlineKeyboardButton(label, callback_data=f"{sport}:{idx}")
             ])
@@ -538,20 +614,54 @@ async def add_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     try:
-        start, end, cap = context.args
+        # فرمت جدید: /add_basketball_time 2026-02-11 18:00 19:00 15
+        # یا: /add_basketball_time 1404/11/23 18:00 19:00 15
+        
+        if len(context.args) != 4:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_basketball_time تاریخ start end cap\n"
+                "مثال میلادی: /add_basketball_time 2026-02-11 18:00 19:00 15\n"
+                "مثال شمسی: /add_basketball_time 1404/11/23 18:00 19:00 15"
+            )
+            return
+
+        date_str, start, end, cap = context.args
+        
+        # تبدیل تاریخ
+        date_obj = parse_date(date_str)
+        if not date_obj:
+            await update.message.reply_text("❌ تاریخ نامعتبر است")
+            return
+            
+        # بررسی اینکه تاریخ گذشته نباشه
+        if date_obj < date.today():
+            await update.message.reply_text("❌ این تاریخ گذشته است!")
+            return
 
         RAM_TIMES["basketball"].append({
+            "date": date_obj.isoformat(),
+            "date_obj": date_obj,
             "start": start,
             "end": end,
-            "cap": int(cap),
-            "players": []
+            "cap": int(cap)
         })
 
-        await update.message.reply_text("✅ تایم بسکتبال اضافه شد")
+        # مرتب‌سازی بر اساس تاریخ
+        RAM_TIMES["basketball"].sort(key=lambda x: x["date_obj"])
+        
+        # نمایش تاریخ شمسی
+        j_date = jdatetime.date.fromgregorian(date=date_obj)
+        await update.message.reply_text(
+            f"✅ تایم بسکتبال اضافه شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {start} تا {end}\n"
+            f"👥 ظرفیت: {cap} نفر"
+        )
 
-    except:
-        await update.message.reply_text("❌ فرمت: /add_basketball_time 18:00 19:00 15")
-
+    except Exception as e:
+        print(f"❌ خطا در add_basketball_time: {e}")
+        await update.message.reply_text("❌ فرمت: /add_basketball_time تاریخ start end cap")
 
 
 
@@ -560,19 +670,48 @@ async def add_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     try:
-        start, end, cap = context.args
+        if len(context.args) != 4:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_volleyball_time تاریخ start end cap\n"
+                "مثال میلادی: /add_volleyball_time 2026-02-11 18:00 19:00 15\n"
+                "مثال شمسی: /add_volleyball_time 1404/11/23 18:00 19:00 15"
+            )
+            return
+
+        date_str, start, end, cap = context.args
+        date_obj = parse_date(date_str)
+        
+        if not date_obj:
+            await update.message.reply_text("❌ تاریخ نامعتبر است")
+            return
+            
+        if date_obj < date.today():
+            await update.message.reply_text("❌ این تاریخ گذشته است!")
+            return
 
         RAM_TIMES["volleyball"].append({
+            "date": date_obj.isoformat(),
+            "date_obj": date_obj,
             "start": start,
             "end": end,
-            "cap": int(cap),
-            "players": []
+            "cap": int(cap)
         })
 
-        await update.message.reply_text("✅ تایم والیبال اضافه شد")
+        RAM_TIMES["volleyball"].sort(key=lambda x: x["date_obj"])
+        
+        j_date = jdatetime.date.fromgregorian(date=date_obj)
+        await update.message.reply_text(
+            f"✅ تایم والیبال اضافه شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {start} تا {end}\n"
+            f"👥 ظرفیت: {cap} نفر"
+        )
 
-    except:
-        await update.message.reply_text("❌ فرمت: /add_volleyball_time 18:00 19:00 15")
+    except Exception as e:
+        print(f"❌ خطا در add_volleyball_time: {e}")
+        await update.message.reply_text("❌ فرمت: /add_volleyball_time تاریخ start end cap")
+
 
 
 
@@ -626,25 +765,95 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
         return
 
     try:
-        start, end, cap = context.args
+        if len(context.args) != 4:
+            await update.message.reply_text(
+                f"❌ فرمت:\n"
+                f"/add{group}time تاریخ start end cap\n"
+                f"مثال میلادی: /add{group}time 2026-02-11 18:00 19:00 15\n"
+                f"مثال شمسی: /add{group}time 1404/11/23 18:00 19:00 15"
+            )
+            return
+
+        date_str, start, end, cap = context.args
+        date_obj = parse_date(date_str)
+        
+        if not date_obj:
+            await update.message.reply_text("❌ تاریخ نامعتبر است")
+            return
+            
+        if date_obj < date.today():
+            await update.message.reply_text("❌ این تاریخ گذشته است!")
+            return
 
         RAM_TIMES["futsal"][group].append({
+            "date": date_obj.isoformat(),
+            "date_obj": date_obj,
             "start": start,
             "end": end,
-            "cap": int(cap),
-            "players": []
-
+            "cap": int(cap)
         })
 
+        RAM_TIMES["futsal"][group].sort(key=lambda x: x["date_obj"])
+        
+        j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
-            f"✅ تایم گروه {group} اضافه شد: {start} تا {end}"
+            f"✅ تایم گروه {group} اضافه شد:\n"
+            f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+            f"⏰ {start} تا {end}\n"
+            f"👥 ظرفیت: {cap} نفر"
         )
 
-    except:
+    except Exception as e:
+        print(f"❌ خطا در add_group_time: {e}")
         await update.message.reply_text(
-            f"❌ فرمت:\n/add{group}time 18:00 19:00 15"
+            f"❌ فرمت:\n/add{group}time تاریخ start end cap"
         )
 
+
+async def cleanup_expired_times():
+    """پاک کردن تایم‌های منقضی شده و ثبت‌نام‌های مربوطه"""
+    today = date.today()
+    
+    # فوتسال
+    for g in "ABCDEFGHIJ":
+        # تایم‌های منقضی شده را پیدا کن
+        expired_indices = []
+        for i, t in enumerate(RAM_TIMES["futsal"][g]):
+            if is_time_expired(t):
+                expired_indices.append(i)
+        
+        # از آخر به اول پاک کن
+        for i in reversed(expired_indices):
+            # پاک کردن ثبت‌نام‌های این تایم
+            time_key = f"time_{i}"
+            if time_key in RAM_REGISTRATIONS["futsal"][g]:
+                del RAM_REGISTRATIONS["futsal"][g][time_key]
+            # پاک کردن تایم
+            del RAM_TIMES["futsal"][g][i]
+    
+    # بسکتبال
+    expired_indices = []
+    for i, t in enumerate(RAM_TIMES["basketball"]):
+        if is_time_expired(t):
+            expired_indices.append(i)
+    
+    for i in reversed(expired_indices):
+        time_key = f"time_{i}"
+        if time_key in RAM_REGISTRATIONS["basketball"]:
+            del RAM_REGISTRATIONS["basketball"][time_key]
+        del RAM_TIMES["basketball"][i]
+    
+    # والیبال
+    expired_indices = []
+    for i, t in enumerate(RAM_TIMES["volleyball"]):
+        if is_time_expired(t):
+            expired_indices.append(i)
+    
+    for i in reversed(expired_indices):
+        time_key = f"time_{i}"
+        if time_key in RAM_REGISTRATIONS["volleyball"]:
+            del RAM_REGISTRATIONS["volleyball"][time_key]
+        del RAM_TIMES["volleyball"][i]
 
 
 # ======================================================
