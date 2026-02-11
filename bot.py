@@ -45,7 +45,7 @@ FUTSAL_GROUPS = {chr(i): set() for i in range(ord("A"), ord("K"))}  # A تا J
 RAM_PLAYERS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},   # group -> {phone: name}
     "basketball": {},                         # phone -> name
-    "volleyball": {}                          # phone -> name
+    "volleyball": {},                          # phone -> name
     "shared": {}                             
 
 }
@@ -85,7 +85,7 @@ def initialize_ram():
 RAM_REGISTRATIONS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},  # group -> {time_id: {phone: name}}
     "basketball": {},  # time_id -> {phone: name}
-    "volleyball": {}   # time_id -> {phone: name}
+    "volleyball": {},   # time_id -> {phone: name}
     "shared": {}                             
 
 }
@@ -97,7 +97,7 @@ RAM_REGISTRATIONS = {
 RAM_TIMES = {
     "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times with date
     "basketball": [],
-    "volleyball": []
+    "volleyball": [],
     "shared": []                                  
 
 }
