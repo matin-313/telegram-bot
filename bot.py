@@ -185,7 +185,7 @@ def is_time_expired(time_dict):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
-        ["🤝 اشتراکی"]
+        ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"]
     ]
 
     await update.message.reply_text(
@@ -1548,6 +1548,282 @@ async def show_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text or "هیچ تایمی وجود ندارد")
 
 
+
+# ======================================================
+# VIEW REGISTRATIONS
+# ======================================================
+
+async def view_registrations_sports(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش رشته‌ها برای مشاهده ثبت‌نام‌ها"""
+    text = update.message.text
+    
+    if text != "📋 لیست ثبت‌نام‌ها":
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("⚽ فوتسال", callback_data="view_futsal")],
+        [InlineKeyboardButton("🏀 بسکتبال", callback_data="view_basketball")],
+        [InlineKeyboardButton("🏐 والیبال", callback_data="view_volleyball")],
+        [InlineKeyboardButton("🤝 اشتراکی", callback_data="view_shared")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="view_back")]
+    ]
+    
+    await update.message.reply_text(
+        "📋 لطفاً رشته مورد نظر را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+
+async def view_sport_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش تایم‌های یک رشته برای مشاهده ثبت‌نام‌ها"""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    today = date.today()
+    
+    if data == "view_futsal":
+        sport = "futsal"
+        sport_name = "⚽ فوتسال"
+        keyboard = []
+        
+        for g in "ABCDEFGHIJ":
+            for idx, t in enumerate(RAM_TIMES["futsal"][g]):
+                if not is_time_expired(t):
+                    j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                    label = f"گروه {g} - {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}"
+                    keyboard.append([
+                        InlineKeyboardButton(label, callback_data=f"view_futsal:{g}:{idx}")
+                    ])
+        
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت به رشته‌ها", callback_data="back_to_sports")])
+        
+        if not keyboard:
+            await query.edit_message_text("❌ تایمی برای فوتسال وجود ندارد")
+            return
+            
+        await query.edit_message_text(
+            f"{sport_name}\n⏰ تایم‌های موجود:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif data == "view_basketball":
+        sport = "basketball"
+        sport_name = "🏀 بسکتبال"
+        keyboard = []
+        
+        for idx, t in enumerate(RAM_TIMES["basketball"]):
+            if not is_time_expired(t):
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                label = f"{j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}"
+                keyboard.append([
+                    InlineKeyboardButton(label, callback_data=f"view_basketball:{idx}")
+                ])
+        
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت به رشته‌ها", callback_data="back_to_sports")])
+        
+        if not keyboard:
+            await query.edit_message_text("❌ تایمی برای بسکتبال وجود ندارد")
+            return
+            
+        await query.edit_message_text(
+            f"{sport_name}\n⏰ تایم‌های موجود:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif data == "view_volleyball":
+        sport = "volleyball"
+        sport_name = "🏐 والیبال"
+        keyboard = []
+        
+        for idx, t in enumerate(RAM_TIMES["volleyball"]):
+            if not is_time_expired(t):
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                label = f"{j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}"
+                keyboard.append([
+                    InlineKeyboardButton(label, callback_data=f"view_volleyball:{idx}")
+                ])
+        
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت به رشته‌ها", callback_data="back_to_sports")])
+        
+        if not keyboard:
+            await query.edit_message_text("❌ تایمی برای والیبال وجود ندارد")
+            return
+            
+        await query.edit_message_text(
+            f"{sport_name}\n⏰ تایم‌های موجود:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif data == "view_shared":
+        sport = "shared"
+        sport_name = "🤝 اشتراکی"
+        keyboard = []
+        
+        for idx, t in enumerate(RAM_TIMES["shared"]):
+            if not is_time_expired(t):
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                label = f"{j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']} (ظرفیت: {t['cap']})"
+                keyboard.append([
+                    InlineKeyboardButton(label, callback_data=f"view_shared:{idx}")
+                ])
+        
+        keyboard.append([InlineKeyboardButton("🔙 بازگشت به رشته‌ها", callback_data="back_to_sports")])
+        
+        if not keyboard:
+            await query.edit_message_text("❌ تایمی برای اشتراکی وجود ندارد")
+            return
+            
+        await query.edit_message_text(
+            f"{sport_name}\n⏰ تایم‌های موجود:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif data == "back_to_sports":
+        keyboard = [
+            [InlineKeyboardButton("⚽ فوتسال", callback_data="view_futsal")],
+            [InlineKeyboardButton("🏀 بسکتبال", callback_data="view_basketball")],
+            [InlineKeyboardButton("🏐 والیبال", callback_data="view_volleyball")],
+            [InlineKeyboardButton("🤝 اشتراکی", callback_data="view_shared")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="view_back")]
+        ]
+        await query.edit_message_text(
+            "📋 لطفاً رشته مورد نظر را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    elif data == "view_back":
+        await query.message.delete()
+
+
+async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست ثبت‌نام‌کنندگان یک تایم"""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    parts = data.split(":")
+    
+    if parts[0] == "view_futsal":
+        group = parts[1]
+        idx = int(parts[2])
+        
+        time_info = RAM_TIMES["futsal"][group][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        # پیدا کردن ثبت‌نام‌ها
+        time_key = f"time_{idx}"
+        registrations = RAM_REGISTRATIONS["futsal"][group].get(time_key, {})
+        
+        text = f"⚽ فوتسال گروه {group}\n"
+        text += f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+        text += f"⏰ {time_info['start']} - {time_info['end']}\n"
+        text += f"👥 ظرفیت: {time_info['cap']}\n"
+        text += f"📊 ثبت‌نام‌ها: {len(registrations)}/{time_info['cap']}\n"
+        text += "─" * 30 + "\n\n"
+        
+        if registrations:
+            for i, (phone, name) in enumerate(registrations.items(), 1):
+                text += f"{i}. {name}\n"
+                text += f"   📱 {phone}\n\n"
+        else:
+            text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
+        
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت به تایم‌ها", callback_data="view_futsal")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    elif parts[0] == "view_basketball":
+        idx = int(parts[1])
+        
+        time_info = RAM_TIMES["basketball"][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        time_key = f"time_{idx}"
+        registrations = RAM_REGISTRATIONS["basketball"].get(time_key, {})
+        
+        text = f"🏀 بسکتبال\n"
+        text += f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+        text += f"⏰ {time_info['start']} - {time_info['end']}\n"
+        text += f"👥 ظرفیت: {time_info['cap']}\n"
+        text += f"📊 ثبت‌نام‌ها: {len(registrations)}/{time_info['cap']}\n"
+        text += "─" * 30 + "\n\n"
+        
+        if registrations:
+            for i, (phone, name) in enumerate(registrations.items(), 1):
+                text += f"{i}. {name}\n"
+                text += f"   📱 {phone}\n\n"
+        else:
+            text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
+        
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت به تایم‌ها", callback_data="view_basketball")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    elif parts[0] == "view_volleyball":
+        idx = int(parts[1])
+        
+        time_info = RAM_TIMES["volleyball"][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        time_key = f"time_{idx}"
+        registrations = RAM_REGISTRATIONS["volleyball"].get(time_key, {})
+        
+        text = f"🏐 والیبال\n"
+        text += f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+        text += f"⏰ {time_info['start']} - {time_info['end']}\n"
+        text += f"👥 ظرفیت: {time_info['cap']}\n"
+        text += f"📊 ثبت‌نام‌ها: {len(registrations)}/{time_info['cap']}\n"
+        text += "─" * 30 + "\n\n"
+        
+        if registrations:
+            for i, (phone, name) in enumerate(registrations.items(), 1):
+                text += f"{i}. {name}\n"
+                text += f"   📱 {phone}\n\n"
+        else:
+            text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
+        
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت به تایم‌ها", callback_data="view_volleyball")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    elif parts[0] == "view_shared":
+        idx = int(parts[1])
+        
+        time_info = RAM_TIMES["shared"][idx]
+        j_date = jdatetime.date.fromgregorian(date=time_info["date_obj"])
+        
+        time_key = f"time_{idx}"
+        registrations = RAM_REGISTRATIONS["shared"].get(time_key, {})
+        
+        text = f"🤝 اشتراکی\n"
+        text += f"📅 {j_date.strftime('%Y/%m/%d')}\n"
+        text += f"⏰ {time_info['start']} - {time_info['end']}\n"
+        text += f"👥 ظرفیت: {time_info['cap']}\n"
+        text += f"📊 ثبت‌نام‌ها: {len(registrations)}/{time_info['cap']}\n"
+        text += "─" * 30 + "\n\n"
+        
+        if registrations:
+            for i, (phone, name) in enumerate(registrations.items(), 1):
+                # پیدا کردن رشته اصلی بازیکن
+                sport_emoji = "👤"
+                if phone in RAM_PLAYERS.get("basketball", {}):
+                    sport_emoji = "🏀"
+                elif phone in RAM_PLAYERS.get("volleyball", {}):
+                    sport_emoji = "🏐"
+                else:
+                    for g in "ABCDEFGHIJ":
+                        if phone in RAM_PLAYERS.get("futsal", {}).get(g, {}):
+                            sport_emoji = "⚽"
+                            break
+                
+                text += f"{i}. {sport_emoji} {name}\n"
+                text += f"   📱 {phone}\n\n"
+        else:
+            text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
+        
+        keyboard = [[InlineKeyboardButton("🔙 بازگشت به تایم‌ها", callback_data="view_shared")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -1644,6 +1920,16 @@ def main():
         register
     ))
 
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📋 لیست ثبت‌نام‌ها$"),
+        view_registrations_sports
+    ))
+    
+    # ✅ هندلرهای نمایش تایم‌ها برای مشاهده
+    app.add_handler(CallbackQueryHandler(view_sport_times, pattern="^view_"))
+    
+    # ✅ هندلر نمایش ثبت‌نام‌کنندگان
+    app.add_handler(CallbackQueryHandler(view_time_registrations, pattern="^view_futsal:|^view_basketball:|^view_volleyball:|^view_shared:"))
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
