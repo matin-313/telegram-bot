@@ -156,7 +156,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         slot = RAM_TIMES["futsal"][group][idx]
         registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(idx, {})
 
-    else:
+    else:  # بسکتبال و والیبال
         if idx >= len(RAM_TIMES[sport]):
             await update.message.reply_text("❌ تایم نامعتبر است")
             context.user_data.clear()
@@ -167,58 +167,87 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     capacity = slot.get("cap", 0)
 
-    # ─────────── player lookup ───────────
+    # ─────────── ✅ بخش اصلاح شده: بررسی بازیکن ───────────
     if sport == "futsal":
-        found_group = None
+        # فوتسال: بررسی در گروه‌ها
+        found_player = False
         found_name = None
-
-        for g in RAM_PLAYERS["futsal"]:
-            for p, name in RAM_PLAYERS["futsal"][g].items():
-                if normalize_phone(p) == phone:
+        found_group = None
+        
+        # 1️⃣ اول در همان گروه جستجو کن
+        if phone in RAM_PLAYERS["futsal"][group]:
+            found_player = True
+            found_name = RAM_PLAYERS["futsal"][group][phone]
+            found_group = group
+        
+        # 2️⃣ اگر در همان گروه نبود، بقیه گروه‌ها رو چک کن
+        else:
+            for g in "ABCDEFGHIJ":
+                if phone in RAM_PLAYERS["futsal"][g]:
+                    found_player = True
+                    found_name = RAM_PLAYERS["futsal"][g][phone]
                     found_group = g
-                    found_name = name
                     break
-            if found_group:
-                break
-
-        if not found_name:
+        
+        # 3️⃣ اگر اصلاً پیدا نشد
+        if not found_player:
             await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
             return
-
+        
+        # 4️⃣ اگر در گروه دیگری بود
         if found_group != group:
             await update.message.reply_text(
                 f"❌ شما عضو گروه {found_group} هستید و نمی‌توانید در گروه {group} ثبت‌نام کنید"
             )
             return
-
+        
         player_name = found_name
 
-    else:
+    else:  # بسکتبال و والیبال
+        # ✅ جستجوی مستقیم در دیکشنری رشته مربوطه
         player_name = RAM_PLAYERS[sport].get(phone)
+        
         if not player_name:
-            await update.message.reply_text("❌ شما در لیست این رشته نیستید")
+            # نام فارسی رشته برای نمایش
+            sport_name = {
+                "basketball": "بسکتبال",
+                "volleyball": "والیبال"
+            }.get(sport, sport)
+            
+            await update.message.reply_text(f"❌ شما در لیست {sport_name} نیستید")
             return
 
-    # ─────────── duplicate / capacity ───────────
+    # ─────────── بررسی تکراری بودن ───────────
     if phone in registrations:
         await update.message.reply_text("❌ قبلاً در این تایم ثبت‌نام کرده‌اید")
         return
 
+    # ─────────── بررسی ظرفیت ───────────
     if len(registrations) >= capacity:
         await update.message.reply_text("❌ ظرفیت این تایم تکمیل شده")
         return
 
-    # ─────────── save ───────────
+    # ─────────── ذخیره نهایی ───────────
     registrations[phone] = player_name
 
+    # ─────────── پیام موفقیت ───────────
+    sport_name = {
+        "futsal": "فوتسال",
+        "basketball": "بسکتبال",
+        "volleyball": "والیبال"
+    }.get(sport, sport)
+    
+    group_text = f" گروه {group}" if sport == "futsal" else ""
+    
     await update.message.reply_text(
         f"✅ ثبت‌نام موفق\n"
         f"👤 {player_name}\n"
-        f"🏅 {sport}"
+        f"🏅 {sport_name}{group_text}\n"
+        f"⏰ {slot['start']} - {slot['end']}"
     )
 
+    # ─────────── پاک کردن حافظه موقت ───────────
     context.user_data.clear()
-
 
 
 # ======================================================
@@ -391,17 +420,19 @@ async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         name, phone = context.args
-        phone = normalize_phone(phone)
+        phone = normalize_phone(phone)  # ✅ نرمالایز شماره قبل از ذخیره
 
         if phone in RAM_PLAYERS["basketball"]:
             await update.message.reply_text("❌ قبلاً ثبت شده")
             return
 
-        RAM_PLAYERS["basketball"][phone] = name
+        RAM_PLAYERS["basketball"][phone] = name  # ✅ ذخیره با شماره نرمالایز شده
 
-        await update.message.reply_text("✅ بازیکن بسکتبال اضافه شد")
-    except:
+        await update.message.reply_text(f"✅ بازیکن بسکتبال اضافه شد:\n👤 {name}\n📱 {phone}")
+    except ValueError:
         await update.message.reply_text("❌ فرمت: /add_basketball نام 09123456789")
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا: {str(e)}")
 
 
 
@@ -411,17 +442,19 @@ async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         name, phone = context.args
-        phone = normalize_phone(phone)
+        phone = normalize_phone(phone)  # ✅ نرمالایز شماره قبل از ذخیره
 
         if phone in RAM_PLAYERS["volleyball"]:
             await update.message.reply_text("❌ قبلاً ثبت شده")
             return
 
-        RAM_PLAYERS["volleyball"][phone] = name
+        RAM_PLAYERS["volleyball"][phone] = name  # ✅ ذخیره با شماره نرمالایز شده
 
-        await update.message.reply_text("✅ بازیکن والیبال اضافه شد")
-    except:
+        await update.message.reply_text(f"✅ بازیکن والیبال اضافه شد:\n👤 {name}\n📱 {phone}")
+    except ValueError:
         await update.message.reply_text("❌ فرمت: /add_volleyball نام 09123456789")
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا: {str(e)}")
 
 
 
@@ -475,7 +508,7 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
 
     try:
         name, phone = context.args
-        phone = normalize_phone(phone)
+        phone = normalize_phone(phone)  # ✅ اول نرمالایز کن
 
         # اگر در همین گروه بود
         if phone in RAM_PLAYERS["futsal"][group]:
@@ -490,7 +523,7 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
                 )
                 return
 
-        # ذخیره
+        # ذخیره با شماره نرمالایز شده
         RAM_PLAYERS["futsal"][group][phone] = name
 
         await update.message.reply_text(
