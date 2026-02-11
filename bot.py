@@ -168,11 +168,16 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # بررسی اینکه آیا بازیکن در *هر* گروه فوتسال هست
         found_group = None
         found_name = None
+        
         for g in "ABCDEFGHIJ":
-            if phone in RAM_PLAYERS["futsal"].get(g, {}):
-                found_group = g
-                found_name = RAM_PLAYERS["futsal"][g][phone]
+            for stored_phone, stored_name in RAM_PLAYERS["futsal"][g].items():
+                if normalize_phone(stored_phone) == phone:
+                    found_group = g
+                    found_name = stored_name
+                    break
+            if found_group:
                 break
+
 
         if not found_name:
             await update.message.reply_text("❌ شما در لیست فوتسال نیستید")
