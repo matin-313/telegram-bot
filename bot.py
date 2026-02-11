@@ -423,8 +423,14 @@ async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for time_key, users in RAM_REGISTRATIONS["futsal"][g].items():
             if users:
                 has_users = True
-                # پیدا کردن تاریخ تایم
-                time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+                
+                # ✅ پشتیبانی از هر دو فرمت (time_0 و 0)
+                if isinstance(time_key, int) or time_key.isdigit():
+                    time_idx = int(time_key)
+                    time_key_display = f"time_{time_idx}"
+                else:
+                    time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+                
                 if time_idx < len(RAM_TIMES["futsal"][g]):
                     t = RAM_TIMES["futsal"][g][time_idx]
                     j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
@@ -440,7 +446,13 @@ async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for time_key, users in RAM_REGISTRATIONS["basketball"].items():
         if users:
             has_users = True
-            time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+            
+            # ✅ پشتیبانی از هر دو فرمت
+            if isinstance(time_key, int) or time_key.isdigit():
+                time_idx = int(time_key)
+            else:
+                time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+                
             if time_idx < len(RAM_TIMES["basketball"]):
                 t = RAM_TIMES["basketball"][time_idx]
                 j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
@@ -456,7 +468,13 @@ async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for time_key, users in RAM_REGISTRATIONS["volleyball"].items():
         if users:
             has_users = True
-            time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+            
+            # ✅ پشتیبانی از هر دو فرمت
+            if isinstance(time_key, int) or time_key.isdigit():
+                time_idx = int(time_key)
+            else:
+                time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+                
             if time_idx < len(RAM_TIMES["volleyball"]):
                 t = RAM_TIMES["volleyball"][time_idx]
                 j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
@@ -466,6 +484,40 @@ async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             for phone, name in users.items():
                 text += f"  👤 {name}\n"
+            text += "\n"
+
+    # بخش اشتراکی
+    for time_key, users in RAM_REGISTRATIONS.get("shared", {}).items():
+        if users:
+            has_users = True
+            
+            # ✅ پشتیبانی از هر دو فرمت
+            if isinstance(time_key, int) or time_key.isdigit():
+                time_idx = int(time_key)
+            else:
+                time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+                
+            if time_idx < len(RAM_TIMES.get("shared", [])):
+                t = RAM_TIMES["shared"][time_idx]
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                text += f"🤝 اشتراکی - {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}:\n"
+            else:
+                text += f"🤝 اشتراکی تایم {time_key}:\n"
+            
+            for phone, name in users.items():
+                # پیدا کردن رشته اصلی بازیکن
+                sport_emoji = "👤"
+                if phone in RAM_PLAYERS.get("basketball", {}):
+                    sport_emoji = "🏀"
+                elif phone in RAM_PLAYERS.get("volleyball", {}):
+                    sport_emoji = "🏐"
+                else:
+                    for g in "ABCDEFGHIJ":
+                        if phone in RAM_PLAYERS.get("futsal", {}).get(g, {}):
+                            sport_emoji = "⚽"
+                            break
+                
+                text += f"  {sport_emoji} {name}\n"
             text += "\n"
 
     await update.message.reply_text(text if has_users else "📭 هیچ ثبت‌نامی وجود ندارد")
