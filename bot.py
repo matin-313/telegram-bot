@@ -351,59 +351,63 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ADMIN COMMANDS
 # ======================================================
 async def today_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if not is_admin(update.effective_user.id):
         return
 
     text = "📄 ثبت‌نام‌های امروز (RAM):\n\n"
+    has_users = False
 
     # فوتسال گروهی
     for g in "ABCDEFGHIJ":
-        for time_id, users in RAM_REGISTRATIONS["futsal"][g].items():
-            text += f"⚽ فوتسال گروه {g} تایم {time_id}:\n"
+        for time_key, users in RAM_REGISTRATIONS["futsal"][g].items():
+            if users:
+                has_users = True
+                # پیدا کردن تاریخ تایم
+                time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+                if time_idx < len(RAM_TIMES["futsal"][g]):
+                    t = RAM_TIMES["futsal"][g][time_idx]
+                    j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                    text += f"⚽ فوتسال گروه {g} - {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}:\n"
+                else:
+                    text += f"⚽ فوتسال گروه {g} تایم {time_key}:\n"
+                
+                for phone, name in users.items():
+                    text += f"  👤 {name}\n"
+                text += "\n"
+
+    # بسکتبال
+    for time_key, users in RAM_REGISTRATIONS["basketball"].items():
+        if users:
+            has_users = True
+            time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+            if time_idx < len(RAM_TIMES["basketball"]):
+                t = RAM_TIMES["basketball"][time_idx]
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                text += f"🏀 بسکتبال - {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}:\n"
+            else:
+                text += f"🏀 بسکتبال تایم {time_key}:\n"
+            
             for phone, name in users.items():
-                text += f" - {name} ({phone})\n"
-
-    # بسکتبال
-    for time_id, users in RAM_REGISTRATIONS["basketball"].items():
-        text += f"\n🏀 بسکتبال تایم {time_id}:\n"
-        for phone, name in users.items():
-            text += f" - {name} ({phone})\n"
-
+                text += f"  👤 {name}\n"
+            text += "\n"
 
     # والیبال
-    for time_id, users in RAM_REGISTRATIONS["volleyball"].items():
-        text += f"\n🏐 والیبال تایم {time_id}:\n"
-        for phone, name in users.items():
-            text += f" - {name} ({phone})\n"
+    for time_key, users in RAM_REGISTRATIONS["volleyball"].items():
+        if users:
+            has_users = True
+            time_idx = int(time_key.split("_")[1]) if "_" in time_key else 0
+            if time_idx < len(RAM_TIMES["volleyball"]):
+                t = RAM_TIMES["volleyball"][time_idx]
+                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
+                text += f"🏐 والیبال - {j_date.strftime('%Y/%m/%d')} {t['start']}-{t['end']}:\n"
+            else:
+                text += f"🏐 والیبال تایم {time_key}:\n"
+            
+            for phone, name in users.items():
+                text += f"  👤 {name}\n"
+            text += "\n"
 
-
-    has_users = False
-    
-    # فوتسال
-    for g in "ABCDEFGHIJ":
-        for users in RAM_REGISTRATIONS["futsal"][g].values():
-            if users:
-                has_users = True
-                break
-        if has_users:
-            break
-    
-    # بسکتبال
-    if not has_users:
-        for users in RAM_REGISTRATIONS["basketball"].values():
-            if users:
-                has_users = True
-                break
-    
-    # والیبال
-    if not has_users:
-        for users in RAM_REGISTRATIONS["volleyball"].values():
-            if users:
-                has_users = True
-                break
-    
-    await update.message.reply_text(text if has_users else "خالی")
+    await update.message.reply_text(text if has_users else "📭 هیچ ثبت‌نامی وجود ندارد")
 
 
 # ======================================================
@@ -547,14 +551,21 @@ async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        name, phone = context.args
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_basketball نام‌و‌فامیلی 09123456789\n"
+                "مثال: /add_basketball علی محمدی 09123456789"
+            )
+            return
+            
+        phone = context.args[-1]
+        full_name = " ".join(context.args[:-1])
+        
         phone = normalize_phone(phone)
         
-        # ✅ لاگ برای دیباگ
-        print(f"🟡 افزودن بازیکن بسکتبال: {name} - {phone}")
-        print(f"   RAM_PLAYERS[basketball] قبل: {RAM_PLAYERS['basketball']}")
+        print(f"🟡 افزودن بازیکن بسکتبال: {full_name} - {phone}")
 
-        # مقداردهی مجدد اگر None یا تعریف نشده باشد
         if RAM_PLAYERS.get("basketball") is None:
             RAM_PLAYERS["basketball"] = {}
             
@@ -562,16 +573,20 @@ async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ قبلاً ثبت شده")
             return
 
-        RAM_PLAYERS["basketball"][phone] = name
+        RAM_PLAYERS["basketball"][phone] = full_name
         
-        # ✅ لاگ بعد از ذخیره
-        print(f"   RAM_PLAYERS[basketball] بعد: {RAM_PLAYERS['basketball']}")
-        print(f"✅ بازیکن بسکتبال اضافه شد: {phone} -> {name}")
-
-        await update.message.reply_text(f"✅ بازیکن بسکتبال اضافه شد:\n👤 {name}\n📱 {phone}")
+        print(f"✅ بازیکن بسکتبال اضافه شد: {phone} -> {full_name}")
+        await update.message.reply_text(
+            f"✅ بازیکن بسکتبال اضافه شد:\n"
+            f"👤 {full_name}\n"
+            f"📱 {phone}"
+        )
+        
     except Exception as e:
         print(f"❌ خطا در add_basketball: {e}")
-        await update.message.reply_text("❌ فرمت: /add_basketball نام 09123456789")
+        await update.message.reply_text(
+            "❌ فرمت: /add_basketball نام‌و‌فامیلی 09123456789"
+        )
 
 
 
@@ -580,14 +595,21 @@ async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        name, phone = context.args
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_volleyball نام‌و‌فامیلی 09123456789\n"
+                "مثال: /add_volleyball علی محمدی 09123456789"
+            )
+            return
+            
+        phone = context.args[-1]
+        full_name = " ".join(context.args[:-1])
+        
         phone = normalize_phone(phone)
         
-        # ✅ لاگ برای دیباگ
-        print(f"🟡 افزودن بازیکن والیبال: {name} - {phone}")
-        print(f"   RAM_PLAYERS[volleyball] قبل: {RAM_PLAYERS['volleyball']}")
+        print(f"🟡 افزودن بازیکن والیبال: {full_name} - {phone}")
 
-        # مقداردهی مجدد اگر None یا تعریف نشده باشد
         if RAM_PLAYERS.get("volleyball") is None:
             RAM_PLAYERS["volleyball"] = {}
             
@@ -595,16 +617,20 @@ async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ قبلاً ثبت شده")
             return
 
-        RAM_PLAYERS["volleyball"][phone] = name
+        RAM_PLAYERS["volleyball"][phone] = full_name
         
-        # ✅ لاگ بعد از ذخیره
-        print(f"   RAM_PLAYERS[volleyball] بعد: {RAM_PLAYERS['volleyball']}")
-        print(f"✅ بازیکن والیبال اضافه شد: {phone} -> {name}")
-
-        await update.message.reply_text(f"✅ بازیکن والیبال اضافه شد:\n👤 {name}\n📱 {phone}")
+        print(f"✅ بازیکن والیبال اضافه شد: {phone} -> {full_name}")
+        await update.message.reply_text(
+            f"✅ بازیکن والیبال اضافه شد:\n"
+            f"👤 {full_name}\n"
+            f"📱 {phone}"
+        )
+        
     except Exception as e:
         print(f"❌ خطا در add_volleyball: {e}")
-        await update.message.reply_text("❌ فرمت: /add_volleyball نام 09123456789")
+        await update.message.reply_text(
+            "❌ فرمت: /add_volleyball نام‌و‌فامیلی 09123456789"
+        )
 
 
 
@@ -720,11 +746,23 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         return
 
     try:
-        name, phone = context.args
+        # بررسی تعداد آرگومان‌ها - حداقل 2 تا (شماره + حداقل یک کلمه نام)
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                f"❌ فرمت:\n"
+                f"/add{group}player نام‌و‌فامیلی 09123456789\n"
+                f"مثال: /add{group}player علی محمدی 09123456789"
+            )
+            return
+        
+        # شماره همیشه آخرین آرگومان است
+        phone = context.args[-1]
+        # بقیه آرگومان‌ها نام و فامیلی هستند
+        full_name = " ".join(context.args[:-1])
+        
         phone = normalize_phone(phone)
         
-        # ✅ لاگ برای دیباگ
-        print(f"🟡 افزودن بازیکن فوتسال گروه {group}: {name} - {phone}")
+        print(f"🟡 افزودن بازیکن فوتسال گروه {group}: {full_name} - {phone}")
 
         # اطمینان از وجود ساختار
         if group not in RAM_PLAYERS["futsal"]:
@@ -743,19 +781,22 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
                 )
                 return
 
-        # ذخیره با شماره نرمالایز شده
-        RAM_PLAYERS["futsal"][group][phone] = name
+        # ذخیره با نام کامل
+        RAM_PLAYERS["futsal"][group][phone] = full_name
         
-        print(f"✅ بازیکن فوتسال اضافه شد: گروه {group}, {phone} -> {name}")
+        print(f"✅ بازیکن فوتسال اضافه شد: گروه {group}, {phone} -> {full_name}")
 
         await update.message.reply_text(
-            f"✅ بازیکن {name} به گروه فوتسال {group} اضافه شد"
+            f"✅ بازیکن به گروه فوتسال {group} اضافه شد:\n"
+            f"👤 {full_name}\n"
+            f"📱 {phone}"
         )
 
     except Exception as e:
         print(f"❌ خطا در add_group_player: {e}")
         await update.message.reply_text(
-            f"❌ فرمت:\n/add{group}player نام 09123456789"
+            f"❌ فرمت:\n"
+            f"/add{group}player نام‌و‌فامیلی 09123456789"
         )
 
 
@@ -856,6 +897,42 @@ async def cleanup_expired_times():
         del RAM_TIMES["volleyball"][i]
 
 
+async def show_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_super(update.effective_user.id):
+        return
+    
+    text = "📋 لیست بازیکنان:\n\n"
+    
+    # فوتسال
+    for g in "ABCDEFGHIJ":
+        if RAM_PLAYERS["futsal"][g]:
+            text += f"⚽ فوتسال گروه {g}: {len(RAM_PLAYERS['futsal'][g])} نفر\n"
+            for phone, name in list(RAM_PLAYERS["futsal"][g].items())[:10]:  # فقط 10 تا
+                text += f"  - {name} : {phone}\n"
+            if len(RAM_PLAYERS["futsal"][g]) > 10:
+                text += f"  ... و {len(RAM_PLAYERS['futsal'][g]) - 10} نفر دیگر\n"
+            text += "\n"
+    
+    # بسکتبال
+    if RAM_PLAYERS["basketball"]:
+        text += f"🏀 بسکتبال: {len(RAM_PLAYERS['basketball'])} نفر\n"
+        for phone, name in list(RAM_PLAYERS["basketball"].items())[:10]:
+            text += f"  - {name} : {phone}\n"
+        if len(RAM_PLAYERS["basketball"]) > 10:
+            text += f"  ... و {len(RAM_PLAYERS['basketball']) - 10} نفر دیگر\n"
+        text += "\n"
+    
+    # والیبال
+    if RAM_PLAYERS["volleyball"]:
+        text += f"🏐 والیبال: {len(RAM_PLAYERS['volleyball'])} نفر\n"
+        for phone, name in list(RAM_PLAYERS["volleyball"].items())[:10]:
+            text += f"  - {name} : {phone}\n"
+        if len(RAM_PLAYERS["volleyball"]) > 10:
+            text += f"  ... و {len(RAM_PLAYERS['volleyball']) - 10} نفر دیگر\n"
+    
+    await update.message.reply_text(text or "هیچ بازیکنی ثبت نشده")
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -887,6 +964,7 @@ def main():
     # هندلرها
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("today", today_list))
+    app.add_handler(CommandHandler("show_players", show_players))
     app.add_handler(CommandHandler("add_basketball", add_basketball))
     app.add_handler(CommandHandler("add_volleyball", add_volleyball))
     app.add_handler(CommandHandler("add_basketball_time", add_basketball_time))
