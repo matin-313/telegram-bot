@@ -46,7 +46,7 @@ RAM_PLAYERS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},   # group -> {phone: name}
     "basketball": {},                         # phone -> name
     "volleyball": {}                          # phone -> name
-    "shared": {}                             # ✅ این خط رو اضافه کن
+    "shared": {}                             
 
 }
 
@@ -59,21 +59,24 @@ def initialize_ram():
     RAM_PLAYERS = {
         "futsal": {g: {} for g in "ABCDEFGHIJ"},
         "basketball": {},
-        "volleyball": {}
+        "volleyball": {},
+        "shared": {}                 
     }
     
     # تایم‌ها
     RAM_TIMES = {
         "futsal": {g: [] for g in "ABCDEFGHIJ"},
         "basketball": [],
-        "volleyball": []
+        "volleyball": [],
+        "shared": []     
     }
     
     # ثبت‌نام‌ها
     RAM_REGISTRATIONS = {
         "futsal": {g: {} for g in "ABCDEFGHIJ"},
         "basketball": {},
-        "volleyball": {}
+        "volleyball": {},
+        "shared": {}                             
     }
 
 # ======================================================
@@ -83,7 +86,7 @@ RAM_REGISTRATIONS = {
     "futsal": {g: {} for g in "ABCDEFGHIJ"},  # group -> {time_id: {phone: name}}
     "basketball": {},  # time_id -> {phone: name}
     "volleyball": {}   # time_id -> {phone: name}
-    "shared": {}                             # ✅ این خط رو اضافه کن
+    "shared": {}                             
 
 }
 
@@ -95,7 +98,7 @@ RAM_TIMES = {
     "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times with date
     "basketball": [],
     "volleyball": []
-    "shared": {}                             # ✅ این خط رو اضافه کن
+    "shared": []                                  
 
 }
 
