@@ -239,7 +239,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         slot = RAM_TIMES["futsal"][group][idx]
         time_key = f"time_{idx}"
-        registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(idx, {})
+        registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(time_key, {})
 
     elif sport == "shared":
         # ✅ بخش اشتراکی - validation
@@ -250,7 +250,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         slot = RAM_TIMES["shared"][idx]
         time_key = f"time_{idx}"
-        registrations = RAM_REGISTRATIONS["shared"].setdefault(idx, {})
+        registrations = RAM_REGISTRATIONS["shared"].setdefault(time_key, {})
 
     else:  # بسکتبال و والیبال
         if idx >= len(RAM_TIMES[sport]):
@@ -260,7 +260,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         slot = RAM_TIMES[sport][idx]
         time_key = f"time_{idx}"
-        registrations = RAM_REGISTRATIONS[sport].setdefault(idx, {})
+        registrations = RAM_REGISTRATIONS[sport].setdefault(time_key, {})
 
     capacity = slot.get("cap", 0)
 
