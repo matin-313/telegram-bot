@@ -1582,6 +1582,8 @@ async def view_sport_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = query.data
     today = date.today()
+    print(f"📞 view_sport_times دریافت: {data}")  # برای دیباگ
+
     
     if data == "view_futsal":
         sport = "futsal"
@@ -1680,7 +1682,7 @@ async def view_sport_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
-    elif data == "back_to_sports":
+    elif data == "back_to_sports":  # ✅ این بخش رو اضافه کنید
         keyboard = [
             [InlineKeyboardButton("⚽ فوتسال", callback_data="view_futsal")],
             [InlineKeyboardButton("🏀 بسکتبال", callback_data="view_basketball")],
@@ -1695,6 +1697,9 @@ async def view_sport_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif data == "view_back":
         await query.message.delete()
+    
+    else:
+        print(f"⚠️ داده ناشناخته: {data}")
 
 
 async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_TYPE):
