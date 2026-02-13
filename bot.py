@@ -594,8 +594,8 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for idx, t in enumerate(active_times):
                 # تاریخ شمسی - فقط ماه/روز
                 j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
-                # ✅ فرمت کوتاه: 11/23 20:00-21:00 | A
-                label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} | {g}"
+                # ✅ فرمت کوتاه با ظرفیت: 11/23 20:00-21:00 (15) | A
+                label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']}) | {g}"
                 keyboard.append([
                     InlineKeyboardButton(label, callback_data=f"futsal:{g}:{idx}")
                 ])
@@ -610,12 +610,12 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, t in enumerate(active_times):
             j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
             
+            # ✅ همه رشته‌ها ظرفیت داشته باشن
+            label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
+            
+            # اموجی مخصوص برای اشتراکی
             if sport == "shared":
-                # ✅ فرمت کوتاه برای اشتراکی: 11/23 20:00-21:00 (15) 🤝
-                label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']}) 🤝"
-            else:
-                # ✅ فرمت کوتاه برای بقیه: 11/23 20:00-21:00
-                label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']}"
+                label += " 🤝"
 
             keyboard.append([
                 InlineKeyboardButton(label, callback_data=f"{sport}:{idx}")
