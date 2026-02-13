@@ -594,8 +594,8 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for idx, t in enumerate(active_times):
                 # تاریخ شمسی - فقط ماه/روز
                 j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
-                # ✅ فرمت کوتاه با ظرفیت: 11/23 20:00-21:00 (15) | A
-                label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']}) | {g}"
+                # ✅ گروه رو اول بیار: A | 11/23 20:00-21:00 (15)
+                label = f"{g} | {j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
                 keyboard.append([
                     InlineKeyboardButton(label, callback_data=f"futsal:{g}:{idx}")
                 ])
@@ -610,7 +610,7 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, t in enumerate(active_times):
             j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
             
-            # ✅ همه رشته‌ها ظرفیت داشته باشن
+            # همه رشته‌ها ظرفیت داشته باشن
             label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
             
             # اموجی مخصوص برای اشتراکی
