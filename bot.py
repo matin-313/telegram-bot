@@ -640,6 +640,7 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data.split(":")
     sport = data[0]
+    today = date.today()
 
     # فوتسال گروهی
     if sport == "futsal":
@@ -651,13 +652,51 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ خطا در انتخاب تایم")
             return
 
-        # ✅ اینجا بیرون except قرار گرفت
+        # بررسی تاریخ تایم
+        if idx < len(RAM_TIMES["futsal"][group]):
+            time_info = RAM_TIMES["futsal"][group][idx]
+            time_date = time_info.get("date_obj")
+            
+            if time_date and time_date > today:
+                j_date = jdatetime.date.fromgregorian(date=time_date)
+                await query.edit_message_text(
+                    f"⏰ مهلت ثبت‌نام برای این تایم هنوز شروع نشده!\n"
+                    f"📅 تاریخ تایم: {j_date.strftime('%Y/%m/%d')}\n"
+                    f"❌ فقط در روز برگزاری می‌توانید ثبت‌نام کنید"
+                )
+                return
+
         context.user_data["sport"] = "futsal"
         context.user_data["group"] = group
         context.user_data["time_index"] = idx
 
     else:
-        idx = int(data[1])
+        try:
+            idx = int(data[1])
+        except:
+            await query.edit_message_text("❌ خطا در انتخاب تایم")
+            return
+
+        # بررسی تاریخ تایم برای بسکتبال، والیبال و اشتراکی
+        if idx < len(RAM_TIMES[sport]):
+            time_info = RAM_TIMES[sport][idx]
+            time_date = time_info.get("date_obj")
+            
+            if time_date and time_date > today:
+                j_date = jdatetime.date.fromgregorian(date=time_date)
+                sport_name = {
+                    "basketball": "بسکتبال",
+                    "volleyball": "والیبال",
+                    "shared": "اشتراکی"
+                }.get(sport, sport)
+                
+                await query.edit_message_text(
+                    f"⏰ مهلت ثبت‌نام برای این تایم {sport_name} هنوز شروع نشده!\n"
+                    f"📅 تاریخ تایم: {j_date.strftime('%Y/%m/%d')}\n"
+                    f"❌ فقط در روز برگزاری می‌توانید ثبت‌نام کنید"
+                )
+                return
+
         context.user_data["sport"] = sport
         context.user_data["time_index"] = idx
         
@@ -670,7 +709,6 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
     )
-
 
 
 
