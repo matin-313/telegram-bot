@@ -1925,11 +1925,17 @@ def main():
         view_registrations_sports
     ))
     
-    # ✅ هندلر نمایش ثبت‌نام‌کنندگان
-    app.add_handler(CallbackQueryHandler(view_time_registrations, pattern="^view_futsal:|^view_basketball:|^view_volleyball:|^view_shared:")) 
+    # ✅ 1. اول هندلر تایم‌ها (اختصاصی‌ترین)
+    app.add_handler(CallbackQueryHandler(
+        view_time_registrations, 
+        pattern="^view_(futsal:[A-J]:[0-9]+|basketball:[0-9]+|volleyball:[0-9]+|shared:[0-9]+)$"
+    ))
     
-    # ✅ هندلرهای نمایش تایم‌ها برای مشاهده
-    app.add_handler(CallbackQueryHandler(view_sport_times, pattern="^view_"))
+    # ✅ 2. بعد هندلر رشته‌ها (میانی)
+    app.add_handler(CallbackQueryHandler(
+        view_sport_times, 
+        pattern="^view_(futsal|basketball|volleyball|shared|back_to_sports|back)$"
+    ))
     
 
 
