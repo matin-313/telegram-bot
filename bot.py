@@ -1703,7 +1703,7 @@ async def view_sport_times(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش لیست ثبت‌نام‌کنندگان یک تایم"""
+    """نمایش لیست ثبت‌نام‌کنندگان یک تایم (فقط اسامی)"""
     query = update.callback_query
     await query.answer()
     
@@ -1730,8 +1730,7 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
         
         if registrations:
             for i, (phone, name) in enumerate(registrations.items(), 1):
-                text += f"{i}. {name}\n"
-                text += f"   📱 {phone}\n\n"
+                text += f"{i}. {name}\n"  # ✅ فقط اسم
         else:
             text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
         
@@ -1756,8 +1755,7 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
         
         if registrations:
             for i, (phone, name) in enumerate(registrations.items(), 1):
-                text += f"{i}. {name}\n"
-                text += f"   📱 {phone}\n\n"
+                text += f"{i}. {name}\n"  # ✅ فقط اسم
         else:
             text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
         
@@ -1782,8 +1780,7 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
         
         if registrations:
             for i, (phone, name) in enumerate(registrations.items(), 1):
-                text += f"{i}. {name}\n"
-                text += f"   📱 {phone}\n\n"
+                text += f"{i}. {name}\n"  # ✅ فقط اسم
         else:
             text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
         
@@ -1808,7 +1805,7 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
         
         if registrations:
             for i, (phone, name) in enumerate(registrations.items(), 1):
-                # پیدا کردن رشته اصلی بازیکن
+                # پیدا کردن رشته اصلی بازیکن برای نمایش اموجی
                 sport_emoji = "👤"
                 if phone in RAM_PLAYERS.get("basketball", {}):
                     sport_emoji = "🏀"
@@ -1820,8 +1817,7 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
                             sport_emoji = "⚽"
                             break
                 
-                text += f"{i}. {sport_emoji} {name}\n"
-                text += f"   📱 {phone}\n\n"
+                text += f"{i}. {sport_emoji} {name}\n"  # ✅ فقط اسم با اموجی رشته
         else:
             text += "❌ هیچ ثبت‌نامی وجود ندارد\n"
         
