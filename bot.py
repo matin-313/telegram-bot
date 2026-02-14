@@ -2948,13 +2948,6 @@ def main():
         register
     ))
 
-    # بعد هندلر پاسخ ادمین (با شرط replying_to که در خود تابع کنترل می‌کنیم)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_reply))
-    
-    # در آخر هندلر عمومی کاربران (برای پیام به ادمین)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_message))
-
-
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^📋 لیست ثبت‌نام‌ها$"),
         view_registrations_sports
@@ -2984,22 +2977,26 @@ def main():
     app.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^broadcast_"))
 
 
-    # هندلرهای تماس با ادمین
+    # هندلرهای تماس با ادمین - ترتیب مهم است!
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^📨 تماس با ادمین$"),
         contact_admin
     ))
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_user_message
-    ))
     app.add_handler(CommandHandler("cancel", cancel_contact))
     app.add_handler(CallbackQueryHandler(reply_to_user_callback, pattern="^reply_"))
+    app.add_handler(CommandHandler("cancel_reply", cancel_reply))
+    
+    # اول هندلر پاسخ ادمین (برای وقتی که ادمین در حال پاسخ دادن است)
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_admin_reply
     ))
-    app.add_handler(CommandHandler("cancel_reply", cancel_reply))
+    
+    # بعد هندلر پیام کاربر عادی (برای وقتی که کاربر عادی پیام می‌فرستد)
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_user_message
+    ))
 
     
 
