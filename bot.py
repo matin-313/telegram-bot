@@ -118,6 +118,20 @@ RAM_TIMES = {
 logging.basicConfig(level=logging.INFO)
 
 
+
+# ======================================================
+# REQUIRED CHANNELS
+# ======================================================
+REQUIRED_CHANNELS = [
+    {"username": "@test1386", "name": "تست", "url": "https://t.me/test1386"},
+]
+
+# یا برای گروه‌های خصوصی با آیدی عددی:
+REQUIRED_GROUPS = []
+
+
+
+
 # ======================================================
 # normalize phone
 # ======================================================
@@ -183,6 +197,11 @@ def is_time_expired(time_dict):
 # START
 # ======================================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+    # بررسی عضویت
+    if not await membership_required(update, context):
+        return
+
     keyboard = [
         ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
         ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"]
@@ -564,6 +583,11 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
 # ======================================================
 
 async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+    # بررسی عضویت
+    if not await membership_required(update, context):
+        return
+
     text = update.message.text
 
     sport_map = {
@@ -1969,6 +1993,100 @@ async def page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
+# ======================================================
+# MEMBERSHIP CHECK
+# ======================================================
+
+async def check_membership(user_id: int, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی عضویت کاربر در کانال‌های اجباری"""
+    
+    not_joined = []
+    
+    for channel in REQUIRED_CHANNELS:
+        try:
+            # تلاش برای دریافت اطلاعات عضو
+            member = await context.bot.get_chat_member(chat_id=channel["username"], user_id=user_id)
+            
+            # وضعیت‌های مجاز: member, administrator, creator
+            if member.status not in ["member", "administrator", "creator"]:
+                not_joined.append(channel)
+                
+        except Exception as e:
+            print(f"❌ خطا در بررسی کانال {channel['username']}: {e}")
+            # اگه خطا خورد، فرض می‌کنیم کاربر عضو نیست
+            not_joined.append(channel)
+    
+    return not_joined
+
+
+async def membership_required(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دکوریتور برای بررسی عضویت قبل از اجرای دستورات"""
+    
+    user_id = update.effective_user.id
+    
+    # بررسی عضویت
+    not_joined = await check_membership(user_id, context)
+    
+    if not_joined:
+        # ساخت پیام و کیبورد
+        text = "🔒 برای استفاده از ربات باید در کانال‌های زیر عضو شوید:\n\n"
+        
+        keyboard = []
+        for channel in not_joined:
+            text += f"🔹 {channel['name']}\n"
+            keyboard.append([InlineKeyboardButton(f"📢 عضویت در {channel['name']}", url=channel["url"])])
+        
+        text += "\n✅ پس از عضویت، دکمه زیر را بزنید."
+        
+        keyboard.append([InlineKeyboardButton("🔄 بررسی مجدد", callback_data="check_membership")])
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return False
+    
+    return True
+
+
+
+async def check_membership_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی مجدد عضویت بعد از کلیک روی دکمه"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    
+    # بررسی مجدد عضویت
+    not_joined = await check_membership(user_id, context)
+    
+    if not_joined:
+        # هنوز عضو نیست
+        text = "❌ شما هنوز در این کانال‌ها عضو نشده‌اید:\n\n"
+        
+        keyboard = []
+        for channel in not_joined:
+            text += f"🔹 {channel['name']}\n"
+            keyboard.append([InlineKeyboardButton(f"📢 عضویت در {channel['name']}", url=channel["url"])])
+        
+        text += "\n📌 لطفاً ابتدا عضو شوید."
+        
+        keyboard.append([InlineKeyboardButton("🔄 بررسی مجدد", callback_data="check_membership")])
+        
+        await query.edit_message_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        # خوش آمدید! همه چیز اوکی است
+        await query.edit_message_text(
+            "✅ عضویت شما تأیید شد!\n"
+            "برای شروع مجدد از /start استفاده کنید."
+        )
+
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -2086,6 +2204,10 @@ def main():
 
     # در main()، بعد از هندلرهای view قبلی:
     app.add_handler(CallbackQueryHandler(page_callback, pattern="^(page_[a-z]+_[0-9]+|close_times)$"))    
+
+
+    app.add_handler(CallbackQueryHandler(check_membership_callback, pattern="^check_membership$"))
+
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
