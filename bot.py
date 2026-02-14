@@ -2985,15 +2985,16 @@ def main():
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_user_message
+    ))   
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_admin_reply
     ))
     app.add_handler(CommandHandler("cancel", cancel_contact))
     app.add_handler(CallbackQueryHandler(reply_to_user_callback, pattern="^reply_"))
     app.add_handler(CommandHandler("cancel_reply", cancel_reply))
     
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_admin_reply
-    ))
+
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
