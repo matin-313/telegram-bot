@@ -578,55 +578,90 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     sport = sport_map[text]
     context.user_data["sport"] = sport
+    context.user_data["page"] = 0  # صفحه اول
 
-    keyboard = []
-    today = date.today()
+    await show_times_page(update, context, sport, 0)
 
-    # فوتسال گروهی
+
+async def show_times_page(update: Update, context: ContextTypes.DEFAULT_TYPE, sport: str, page: int):
+    """نمایش تایم‌های یک صفحه خاص"""
+    
+    # گرفتن همه تایم‌های فعال
     if sport == "futsal":
+        all_times = []
         for g in "ABCDEFGHIJ":
-            # فقط تایم‌های امروز و آینده رو نشون بده
-            active_times = []
             for t in RAM_TIMES["futsal"][g]:
                 if not is_time_expired(t):
-                    active_times.append(t)
-            
-            for idx, t in enumerate(active_times):
-                # تاریخ شمسی - فقط ماه/روز
-                j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
-                # ✅ گروه رو اول بیار: A | 11/23 20:00-21:00 (15)
-                label = f"{g} | {j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
-                keyboard.append([
-                    InlineKeyboardButton(label, callback_data=f"futsal:{g}:{idx}")
-                ])
-
+                    # اضافه کردن گروه به تایم
+                    t_copy = t.copy()
+                    t_copy["group"] = g
+                    all_times.append(t_copy)
     else:
-        # فقط تایم‌های امروز و آینده
-        active_times = []
-        for t in RAM_TIMES[sport]:
-            if not is_time_expired(t):
-                active_times.append(t)
-        
-        for idx, t in enumerate(active_times):
-            j_date = jdatetime.date.fromgregorian(date=t["date_obj"])
-            
-            # همه رشته‌ها ظرفیت داشته باشن
-            label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
-            
-            # اموجی مخصوص برای اشتراکی
-            if sport == "shared":
-                label += " 🤝"
-
-            keyboard.append([
-                InlineKeyboardButton(label, callback_data=f"{sport}:{idx}")
-            ])
-
-    if not keyboard:
+        all_times = [t for t in RAM_TIMES[sport] if not is_time_expired(t)]
+    
+    if not all_times:
         await update.message.reply_text("❌ تایمی وجود ندارد")
         return
-
+    
+    # گروه‌بندی بر اساس تاریخ
+    grouped_times, sorted_dates = group_times_by_date(all_times)
+    
+    if page >= len(sorted_dates):
+        page = len(sorted_dates) - 1
+    elif page < 0:
+        page = 0
+    
+    context.user_data["page"] = page
+    current_date = sorted_dates[page]
+    current_date_obj = datetime.fromisoformat(current_date).date()
+    j_date = jdatetime.date.fromgregorian(date=current_date_obj)
+    
+    # ساخت کیبورد برای تایم‌های این تاریخ
+    keyboard = []
+    times_for_date = grouped_times[current_date]
+    
+    # مرتب‌سازی تایم‌ها بر اساس ساعت شروع
+    times_for_date.sort(key=lambda x: x["start"])
+    
+    for t in times_for_date:
+        if sport == "futsal":
+            group = t.get("group", "A")
+            label = f"{group} | {j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
+            callback = f"futsal:{group}:{all_times.index(t)}"  # ایندکس اصلی
+        else:
+            label = f"{j_date.strftime('%m/%d')} {t['start']}-{t['end']} ({t['cap']})"
+            if sport == "shared":
+                label += " 🤝"
+            callback = f"{sport}:{all_times.index(t)}"
+        
+        keyboard.append([InlineKeyboardButton(label, callback_data=callback)])
+    
+    # دکمه‌های ناوبری
+    nav_buttons = []
+    if page > 0:
+        prev_date = jdatetime.date.fromgregorian(date=datetime.fromisoformat(sorted_dates[page-1]).date())
+        nav_buttons.append(InlineKeyboardButton(f"◀️ {prev_date.strftime('%m/%d')}", callback_data=f"page_{sport}_{page-1}"))
+    
+    if page < len(sorted_dates) - 1:
+        next_date = jdatetime.date.fromgregorian(date=datetime.fromisoformat(sorted_dates[page+1]).date())
+        nav_buttons.append(InlineKeyboardButton(f"{next_date.strftime('%m/%d')} ▶️", callback_data=f"page_{sport}_{page+1}"))
+    
+    if nav_buttons:
+        keyboard.append(nav_buttons)
+    
+    # دکمه بازگشت
+    keyboard.append([InlineKeyboardButton("🔙 بازگشت به رشته‌ها", callback_data="back_to_sports_main")])
+    
+    sport_name = {
+        "futsal": "⚽ فوتسال",
+        "basketball": "🏀 بسکتبال",
+        "volleyball": "🏐 والیبال",
+        "shared": "🤝 اشتراکی"
+    }.get(sport, sport)
+    
     await update.message.reply_text(
-        "⏰ تایم‌های موجود:",
+        f"{sport_name} - 📅 {j_date.strftime('%Y/%m/%d')}\n"
+        f"⏰ تایم‌های این روز:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -652,9 +687,17 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ خطا در انتخاب تایم")
             return
 
-        # بررسی تاریخ تایم
-        if idx < len(RAM_TIMES["futsal"][group]):
-            time_info = RAM_TIMES["futsal"][group][idx]
+        # پیدا کردن تایم با ایندکس اصلی
+        all_times = []
+        for g in "ABCDEFGHIJ":
+            for t in RAM_TIMES["futsal"][g]:
+                if not is_time_expired(t):
+                    t_copy = t.copy()
+                    t_copy["group"] = g
+                    all_times.append(t_copy)
+        
+        if idx < len(all_times):
+            time_info = all_times[idx]
             time_date = time_info.get("date_obj")
             
             if time_date and time_date > today:
@@ -677,7 +720,7 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ خطا در انتخاب تایم")
             return
 
-        # بررسی تاریخ تایم برای بسکتبال، والیبال و اشتراکی
+        # بررسی تاریخ تایم
         if idx < len(RAM_TIMES[sport]):
             time_info = RAM_TIMES[sport][idx]
             time_date = time_info.get("date_obj")
@@ -709,7 +752,6 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         "📱 لطفاً شماره موبایل خود را وارد کنید:\nمثال: 09123456789"
     )
-
 
 
 async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1866,6 +1908,61 @@ async def view_time_registrations(update: Update, context: ContextTypes.DEFAULT_
         await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 
+
+
+# ======================================================
+# PAGINATION UTILS
+# ======================================================
+
+def group_times_by_date(times_list):
+    """گروه‌بندی تایم‌ها بر اساس تاریخ"""
+    grouped = {}
+    for t in times_list:
+        date_str = t["date_obj"].isoformat()
+        if date_str not in grouped:
+            grouped[date_str] = []
+        grouped[date_str].append(t)
+    
+    # تبدیل به لیست و مرتب‌سازی بر اساس تاریخ
+    sorted_dates = sorted(grouped.keys())
+    return grouped, sorted_dates
+
+
+
+
+async def page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر دکمه‌های صفحه‌بندی"""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    parts = data.split("_")
+    
+    if len(parts) == 3 and parts[0] == "page":
+        sport = parts[1]
+        page = int(parts[2])
+        
+        # حذف پیام قبلی
+        await query.message.delete()
+        
+        # نمایش صفحه جدید
+        await show_times_page(query, context, sport, page)
+    
+    elif data == "back_to_sports_main":
+        keyboard = [
+            [InlineKeyboardButton("⚽ فوتسال", callback_data="view_futsal")],
+            [InlineKeyboardButton("🏀 بسکتبال", callback_data="view_basketball")],
+            [InlineKeyboardButton("🏐 والیبال", callback_data="view_volleyball")],
+            [InlineKeyboardButton("🤝 اشتراکی", callback_data="view_shared")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="view_back")]
+        ]
+        await query.edit_message_text(
+            "📋 لطفاً رشته مورد نظر را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -1979,7 +2076,10 @@ def main():
         view_sport_times, 
         pattern="^(view_futsal|view_basketball|view_volleyball|view_shared|back_to_sports|view_back)$"
     ))
-    
+
+
+    # در main()، بعد از هندلرهای view قبلی:
+    app.add_handler(CallbackQueryHandler(page_callback, pattern="^page_"))
 
 
     # JobQueue برای گزارش شبانه
