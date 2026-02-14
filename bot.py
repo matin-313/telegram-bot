@@ -225,7 +225,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
-        ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"]
+        ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"],
+        ["📨 تماس با ادمین"]  
+
     ]
 
     await update.message.reply_text(
@@ -2659,6 +2661,185 @@ async def broadcast_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================================================
+# CONTACT ADMIN SYSTEM
+# ======================================================
+
+# دیکشنری برای ذخیره وضعیت کاربران (منتظر پیام یا نه)
+WAITING_FOR_MESSAGE = {}
+
+async def contact_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """شروع فرآیند تماس با ادمین"""
+    text = update.message.text
+    
+    if text != "📨 تماس با ادمین":
+        return
+    
+    user_id = update.effective_user.id
+    WAITING_FOR_MESSAGE[user_id] = True
+    
+    await update.message.reply_text(
+        "📝 **پیام خود را ارسال کنید**\n\n"
+        "هر متنی که می‌خواهید به ادمین برسه بنویسید.\n"
+        "برای انصراف، /cancel را بزنید.",
+        parse_mode="Markdown"
+    )
+
+
+async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت پیام کاربر و ارسال به ادمین‌ها"""
+    user_id = update.effective_user.id
+    
+    # اگه کاربر در حالت انتظار نیست، ادامه نده
+    if user_id not in WAITING_FOR_MESSAGE or not WAITING_FOR_MESSAGE[user_id]:
+        return
+    
+    # دریافت پیام
+    user = update.effective_user
+    message_text = update.message.text
+    
+    # اطلاعات کاربر
+    user_info = USERS.get(user_id, {})
+    user_name = user_info.get("full_name", user.full_name)
+    username = user_info.get("username", user.username)
+    
+    # ساخت متن برای ادمین
+    admin_text = (
+        f"📨 **پیام جدید از کاربر**\n\n"
+        f"👤 **نام:** {user_name}\n"
+        f"🆔 **آیدی:** `{user_id}`\n"
+    )
+    
+    if username:
+        admin_text += f"📱 **یوزرنیم:** @{username}\n"
+    
+    admin_text += f"\n💬 **متن پیام:**\n{message_text}\n\n"
+    admin_text += f"➖➖➖➖➖➖➖➖➖\n"
+    admin_text += f"🔽 برای پاسخ، روی دکمه زیر کلیک کنید:"
+    
+    # دکمه پاسخ
+    keyboard = [[InlineKeyboardButton("📤 پاسخ به این کاربر", callback_data=f"reply_{user_id}")]]
+    
+    # ارسال به همه ادمین‌ها
+    sent_count = 0
+    for admin_id in SUPER_ADMINS + VIEWER_ADMINS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=admin_text,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+            sent_count += 1
+        except Exception as e:
+            print(f"❌ خطا در ارسال به ادمین {admin_id}: {e}")
+    
+    if sent_count > 0:
+        await update.message.reply_text(
+            "✅ پیام شما با موفقیت به ادمین ارسال شد.\n"
+            "به زودی پاسخ شما داده خواهد شد.",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            "❌ متأسفانه در ارسال پیام مشکل پیش آمد. لطفاً بعداً تلاش کنید.",
+            parse_mode="Markdown"
+        )
+    
+    # پاک کردن وضعیت انتظار
+    WAITING_FOR_MESSAGE.pop(user_id, None)
+
+
+async def cancel_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """لغو فرآیند تماس با ادمین"""
+    user_id = update.effective_user.id
+    
+    if user_id in WAITING_FOR_MESSAGE:
+        WAITING_FOR_MESSAGE.pop(user_id)
+        await update.message.reply_text(
+            "❌ ارسال پیام لغو شد.",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            "شما در حال ارسال پیام نیستید.",
+            parse_mode="Markdown"
+        )
+
+
+async def reply_to_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر پاسخ ادمین به کاربر"""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    if not data.startswith("reply_"):
+        return
+    
+    user_id = int(data.split("_")[1])
+    
+    # ذخیره آیدی کاربر در context.user_data برای استفاده در مرحله بعد
+    context.user_data["replying_to"] = user_id
+    
+    await query.edit_message_text(
+        text=query.message.text + "\n\n✏️ **لطفاً پاسخ خود را بنویسید:**",
+        parse_mode="Markdown"
+    )
+    
+    await query.message.reply_text(
+        f"✏️ پاسخ خود به کاربر (`{user_id}`) را بنویسید.\n"
+        "برای لغو /cancel_reply را بزنید.",
+        parse_mode="Markdown"
+    )
+
+
+async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت پاسخ ادمین و ارسال به کاربر"""
+    admin_id = update.effective_user.id
+    
+    # بررسی اینکه آیا این ادمین در حال پاسخ دادن است
+    if "replying_to" not in context.user_data:
+        return
+    
+    user_id = context.user_data["replying_to"]
+    reply_text = update.message.text
+    
+    # اطلاعات ادمین
+    admin = update.effective_user
+    admin_name = admin.full_name
+    
+    # ارسال پاسخ به کاربر
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=(
+                f"📨 **پاسخ ادمین به پیام شما:**\n\n"
+                f"{reply_text}\n\n"
+                f"➖➖➖➖➖➖➖➖➖\n"
+                f"👤 ارسال شده توسط: {admin_name}"
+            ),
+            parse_mode="Markdown"
+        )
+        
+        await update.message.reply_text("✅ پاسخ شما با موفقیت به کاربر ارسال شد.")
+        
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطا در ارسال پاسخ: {e}")
+    
+    # پاک کردن وضعیت پاسخ
+    context.user_data.pop("replying_to", None)
+
+
+async def cancel_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """لغو پاسخ به کاربر"""
+    if "replying_to" in context.user_data:
+        user_id = context.user_data.pop("replying_to")
+        await update.message.reply_text(f"❌ پاسخ به کاربر {user_id} لغو شد.")
+    else:
+        await update.message.reply_text("شما در حال پاسخ دادن به کسی نیستید.")
+
+
+
+# ======================================================
 # MAIN
 # ======================================================
 def main():
@@ -2796,6 +2977,24 @@ def main():
     app.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^broadcast_"))
 
 
+    # هندلرهای تماس با ادمین
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📨 تماس با ادمین$"),
+        contact_admin
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_user_message
+    ))
+    app.add_handler(CommandHandler("cancel", cancel_contact))
+    app.add_handler(CallbackQueryHandler(reply_to_user_callback, pattern="^reply_"))
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_admin_reply
+    ))
+    app.add_handler(CommandHandler("cancel_reply", cancel_reply))
+
+    
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
