@@ -125,6 +125,13 @@ logging.basicConfig(level=logging.INFO)
 REQUIRED_CHANNELS = [] 
 
 
+
+# ======================================================
+# USERS LIST - GLOBAL VARIABLE
+# ======================================================
+USERS = {}  # key: user_id, value: {"first_name": name, "username": username, "date": datetime}
+
+
 # ======================================================
 # normalize phone
 # ======================================================
@@ -197,6 +204,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # بررسی عضویت
     if not await membership_required(update, context):
         return
+
+    # ذخیره اطلاعات کاربر
+    user = update.effective_user
+    user_id = user.id
+    
+    # اگه کاربر قبلاً ذخیره نشده بود، ذخیره کن
+    if user_id not in USERS:
+        USERS[user_id] = {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username,
+            "full_name": user.full_name,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "language": user.language_code
+        }
+        print(f"✅ کاربر جدید: {user.full_name} ({user_id})")
+
 
     keyboard = [
         ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
@@ -2312,6 +2336,140 @@ async def get_my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================================================
+# USERS LIST COMMAND
+# ======================================================
+
+async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست کاربرانی که ربات را استارت زده‌اند (فقط سوپر ادمین)"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای سوپر ادمین‌ها است")
+        return
+    
+    if not USERS:
+        await update.message.reply_text("📭 هیچ کاربری تاکنون ربات را استارت نزده است")
+        return
+    
+    # آمار کلی
+    total_users = len(USERS)
+    text = f"📊 **آمار کل کاربران:** {total_users} نفر\n\n"
+    text += "📋 **لیست کاربران:**\n"
+    text += "─" * 30 + "\n\n"
+    
+    # تبدیل به لیست و مرتب‌سازی بر اساس تاریخ (جدیدترین اول)
+    sorted_users = sorted(USERS.items(), key=lambda x: x[1]["date"], reverse=True)
+    
+    for i, (user_id, user_info) in enumerate(sorted_users, 1):
+        text += f"**{i}.** "
+        
+        # نام و نام کاربری
+        if user_info.get("full_name"):
+            text += f"👤 {user_info['full_name']}\n"
+        else:
+            name_parts = []
+            if user_info.get("first_name"):
+                name_parts.append(user_info['first_name'])
+            if user_info.get("last_name"):
+                name_parts.append(user_info['last_name'])
+            text += f"👤 {' '.join(name_parts)}\n"
+        
+        # یوزرنیم
+        if user_info.get("username"):
+            text += f"   📱 @{user_info['username']}\n"
+        
+        # آیدی
+        text += f"   🆔 `{user_id}`\n"
+        
+        # تاریخ اولین استارت
+        if user_info.get("date"):
+            text += f"   📅 {user_info['date']}\n"
+        
+        # زبان
+        if user_info.get("language"):
+            text += f"   🌐 {user_info['language']}\n"
+        
+        text += "\n"
+        
+        # برای جلوگیری از پیام خیلی طولانی، هر 20 کاربر رو جدا می‌فرستیم
+        if i % 20 == 0:
+            await update.message.reply_text(text, parse_mode="Markdown")
+            text = ""
+    
+    # ارسال باقیمانده
+    if text:
+        await update.message.reply_text(text, parse_mode="Markdown")
+    
+    # ارسال فایل متنی برای تعداد زیاد کاربران
+    if total_users > 50:
+        # ساخت فایل متنی
+        filename = f"users_list_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"Total Users: {total_users}\n")
+            f.write("=" * 50 + "\n\n")
+            
+            for user_id, user_info in sorted_users:
+                f.write(f"ID: {user_id}\n")
+                if user_info.get("full_name"):
+                    f.write(f"Name: {user_info['full_name']}\n")
+                if user_info.get("username"):
+                    f.write(f"Username: @{user_info['username']}\n")
+                if user_info.get("date"):
+                    f.write(f"First seen: {user_info['date']}\n")
+                f.write("-" * 30 + "\n")
+        
+        # ارسال فایل
+        with open(filename, "rb") as f:
+            await update.message.reply_document(
+                document=f,
+                filename=filename,
+                caption=f"📁 لیست کامل {total_users} کاربر"
+            )
+        
+        # پاک کردن فایل
+        os.remove(filename)
+
+
+async def user_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش آمار کلی کاربران (فقط سوپر ادمین)"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای سوپر ادمین‌ها است")
+        return
+    
+    if not USERS:
+        await update.message.reply_text("📭 هیچ کاربری تاکنون ربات را استارت نزده است")
+        return
+    
+    # آمار کلی
+    total = len(USERS)
+    
+    # آمار بر اساس زبان
+    languages = {}
+    for user_info in USERS.values():
+        lang = user_info.get("language", "unknown")
+        languages[lang] = languages.get(lang, 0) + 1
+    
+    # آمار بر اساس تاریخ
+    from collections import Counter
+    dates = [user_info["date"][:10] for user_info in USERS.values()]  # فقط تاریخ
+    daily_stats = Counter(dates)
+    
+    text = "📊 **آمار کاربران**\n\n"
+    text += f"👥 **کل کاربران:** {total} نفر\n\n"
+    
+    text += "🌐 **بر اساس زبان:**\n"
+    for lang, count in sorted(languages.items(), key=lambda x: x[1], reverse=True):
+        percent = (count / total) * 100
+        text += f"   • {lang}: {count} نفر ({percent:.1f}%)\n"
+    
+    text += "\n📅 **بر اساس روز (آخرین ۷ روز):**\n"
+    sorted_dates = sorted(daily_stats.items(), key=lambda x: x[0], reverse=True)[:7]
+    for date, count in sorted_dates:
+        text += f"   • {date}: {count} نفر\n"
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+
+
+# ======================================================
 # MAIN
 # ======================================================
 def main():
@@ -2368,6 +2526,8 @@ def main():
     app.add_handler(CommandHandler("remove_admin", remove_admin))
     app.add_handler(CommandHandler("list_admins", list_admins))
     app.add_handler(CommandHandler("get_my_id", get_my_id))
+    app.add_handler(CommandHandler("list_users", list_users))
+    app.add_handler(CommandHandler("user_stats", user_stats))
 
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
