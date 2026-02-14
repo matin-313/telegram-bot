@@ -2948,6 +2948,13 @@ def main():
         register
     ))
 
+    # بعد هندلر پاسخ ادمین (با شرط replying_to که در خود تابع کنترل می‌کنیم)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_admin_reply))
+    
+    # در آخر هندلر عمومی کاربران (برای پیام به ادمین)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_message))
+
+
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^📋 لیست ثبت‌نام‌ها$"),
         view_registrations_sports
