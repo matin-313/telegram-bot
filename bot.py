@@ -123,7 +123,7 @@ logging.basicConfig(level=logging.INFO)
 # REQUIRED CHANNELS
 # ======================================================
 REQUIRED_CHANNELS = [
-    {"username": "@test1386", "name": "تست", "url": "https://t.me/test1386"},
+    {"username": "@tset1386", "name": "تست", "url": "https://t.me/tset1386"},
 ]
 
 # یا برای گروه‌های خصوصی با آیدی عددی:
