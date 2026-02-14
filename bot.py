@@ -2977,15 +2977,16 @@ def main():
     app.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^broadcast_"))
     
     
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_admin_reply
-    ))
 
     app.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^📨 تماس با ادمین$"),
         contact_admin
     ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_admin_reply
+    ))
+
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_user_message
