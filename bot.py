@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, time
 from datetime import date, datetime, time, timedelta
 import jdatetime 
+import asyncio  
 from telegram import (
     Update,
     KeyboardButton,
@@ -2469,6 +2470,194 @@ async def user_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
+
+# ======================================================
+# BROADCAST COMMAND
+# ======================================================
+
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پیام همگانی به همه کاربران (فقط سوپر ادمین)"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای سوپر ادمین‌ها است")
+        return
+    
+    # بررسی وجود پیام
+    if not context.args:
+        await update.message.reply_text(
+            "❌ **فرمت صحیح:**\n"
+            "`/broadcast متن پیام شما`\n\n"
+            "یا برای ارسال با دکمه:\n"
+            "`/broadcast -b متن پیام`\n\n"
+            "**مثال:**\n"
+            "`/broadcast سلام به همه دوستان`"
+        )
+        return
+    
+    # بررسی نوع ارسال (با دکمه یا بدون دکمه)
+    has_button = False
+    button_text = ""
+    button_url = ""
+    message_text = ""
+    
+    if context.args[0] == "-b" and len(context.args) >= 4:
+        # فرمت: /broadcast -b متن_دکمه لینک_دکمه متن_پیام
+        has_button = True
+        button_text = context.args[1]
+        button_url = context.args[2]
+        message_text = " ".join(context.args[3:])
+    else:
+        message_text = " ".join(context.args)
+    
+    if not message_text:
+        await update.message.reply_text("❌ متن پیام نمی‌تواند خالی باشد")
+        return
+    
+    # آمار
+    total_users = len(USERS)
+    if total_users == 0:
+        await update.message.reply_text("📭 هیچ کاربری برای ارسال پیام وجود ندارد")
+        return
+    
+    # ارسال پیام تأیید به ادمین
+    confirm_text = (
+        f"📊 **آمار ارسال:**\n"
+        f"👥 تعداد کاربران: {total_users} نفر\n"
+        f"📝 متن پیام:\n{message_text}\n\n"
+        f"آیا مطمئن هستید؟"
+    )
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ بله، ارسال کن", callback_data="broadcast_confirm"),
+            InlineKeyboardButton("❌ لغو", callback_data="broadcast_cancel")
+        ]
+    ]
+    
+    # ذخیره اطلاعات پیام در context.user_data برای استفاده در callback
+    context.user_data["broadcast"] = {
+        "message": message_text,
+        "has_button": has_button,
+        "button_text": button_text if has_button else "",
+        "button_url": button_url if has_button else ""
+    }
+    
+    await update.message.reply_text(
+        confirm_text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def broadcast_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر تأیید یا لغو برادکست"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "broadcast_cancel":
+        await query.edit_message_text("❌ عملیات ارسال لغو شد")
+        return
+    
+    if query.data == "broadcast_confirm":
+        await query.edit_message_text("🔄 در حال ارسال پیام به کاربران...")
+        
+        # دریافت اطلاعات پیام
+        broadcast_info = context.user_data.get("broadcast", {})
+        if not broadcast_info:
+            await query.edit_message_text("❌ خطا: اطلاعات پیام یافت نشد")
+            return
+        
+        message_text = broadcast_info["message"]
+        has_button = broadcast_info["has_button"]
+        button_text = broadcast_info["button_text"]
+        button_url = broadcast_info["button_url"]
+        
+        # آمار ارسال
+        success = 0
+        failed = 0
+        blocked = 0
+        
+        # ساخت کیبورد اگر لازم باشه
+        reply_markup = None
+        if has_button and button_text and button_url:
+            keyboard = [[InlineKeyboardButton(button_text, url=button_url)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # ارسال به همه کاربران
+        for user_id in USERS.keys():
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=message_text,
+                    reply_markup=reply_markup,
+                    parse_mode="Markdown"
+                )
+                success += 1
+                
+                # تأخیر کوچک برای جلوگیری از محدودیت تلگرام
+                if success % 20 == 0:
+                    await asyncio.sleep(1)
+                    
+            except Exception as e:
+                failed += 1
+                error_str = str(e)
+                if "bot was blocked by the user" in error_str:
+                    blocked += 1
+                print(f"❌ خطا در ارسال به {user_id}: {e}")
+        
+        # گزارش نهایی
+        report = (
+            f"✅ **گزارش ارسال برادکست**\n\n"
+            f"📊 **آمار:**\n"
+            f"👥 کل کاربران: {len(USERS)}\n"
+            f"✅ موفق: {success}\n"
+            f"❌ ناموفق: {failed}\n"
+            f"🚫 بلاک کرده: {blocked}\n\n"
+        )
+        
+        if failed > 0:
+            report += "⚠️ برخی کاربران ربات را بلاک کرده یا خطا دارند."
+        
+        await context.bot.send_message(
+            chat_id=query.from_user.id,
+            text=report,
+            parse_mode="Markdown"
+        )
+        
+        # پاک کردن اطلاعات موقت
+        context.user_data.pop("broadcast", None)
+
+
+async def broadcast_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """راهنمای دستور برادکست"""
+    if not is_super(update.effective_user.id):
+        return
+    
+    help_text = (
+        "📢 **راهنمای دستور برادکست**\n\n"
+        "**۱. ارسال متن ساده:**\n"
+        "`/broadcast متن پیام`\n"
+        "مثال: `/broadcast سلام دوستان عزیز`\n\n"
+        
+        "**۲. ارسال با دکمه:**\n"
+        "`/broadcast -b متن_دکمه لینک_دکمه متن_پیام`\n"
+        "مثال: `/broadcast -b عضویت https://t.me/mychannel برای استفاده از ربات در کانال ما عضو شوید`\n\n"
+        
+        "**۳. قالب‌بندی متن:**\n"
+        "• *متن bold* با `*`\n"
+        "• _متن italic_ با `_`\n"
+        "• `متن code` با \\`\\`\n"
+        "• [متن لینک](https://example.com) با `[]()`\n\n"
+        
+        "**نکات مهم:**\n"
+        "• بعد از تأیید، پیام به همه کاربران ارسال می‌شود\n"
+        "• کاربرانی که ربات را بلاک کرده باشند خطا می‌دهند\n"
+        "• ارسال ممکن است چند دقیقه طول بکشد"
+    )
+    
+    await update.message.reply_text(help_text, parse_mode="Markdown")
+
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -2528,6 +2717,8 @@ def main():
     app.add_handler(CommandHandler("get_my_id", get_my_id))
     app.add_handler(CommandHandler("list_users", list_users))
     app.add_handler(CommandHandler("user_stats", user_stats))
+    app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(CommandHandler("broadcast_help", broadcast_help))
 
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
@@ -2600,6 +2791,10 @@ def main():
 
 
     app.add_handler(CallbackQueryHandler(check_membership_callback, pattern="^check_membership$"))
+
+
+    app.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^broadcast_"))
+
 
 
     # JobQueue برای گزارش شبانه
