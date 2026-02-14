@@ -650,7 +650,7 @@ async def show_times_page(update: Update, context: ContextTypes.DEFAULT_TYPE, sp
         keyboard.append(nav_buttons)
     
     # دکمه بازگشت
-    keyboard.append([InlineKeyboardButton("🔙 بازگشت به رشته‌ها", callback_data="back_to_sports_main")])
+    keyboard.append([InlineKeyboardButton("❌ بستن", callback_data="close_times")])
     
     sport_name = {
         "futsal": "⚽ فوتسال",
@@ -1931,11 +1931,17 @@ def group_times_by_date(times_list):
 
 
 async def page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر دکمه‌های صفحه‌بندی"""
+    """هندلر دکمه‌های صفحه‌بندی و بستن"""
     query = update.callback_query
     await query.answer()
     
     data = query.data
+    
+    # دکمه بستن
+    if data == "close_times":
+        await query.message.delete()
+        return
+    
     parts = data.split("_")
     
     if len(parts) == 3 and parts[0] == "page":
@@ -2079,8 +2085,8 @@ def main():
 
 
     # در main()، بعد از هندلرهای view قبلی:
-    app.add_handler(CallbackQueryHandler(page_callback, pattern="^page_"))
-
+    app.add_handler(CallbackQueryHandler(page_callback, pattern="^(page_|close_times)$"))
+    
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
