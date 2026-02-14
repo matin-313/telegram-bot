@@ -28,7 +28,7 @@ from telegram.ext import (
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 SUPER_ADMINS = [6807376124]
-VIEWER_ADMINS = [22222222]
+VIEWER_ADMINS = []  
 
 
 REPORT_TIME = time(23, 59)
@@ -149,8 +149,11 @@ def normalize_phone(raw: str) -> str:
 # ======================================================
 # UTILS
 # ======================================================
-def is_super(uid): return uid in SUPER_ADMINS
-def is_admin(uid): return uid in SUPER_ADMINS or uid in VIEWER_ADMINS
+def is_super(uid): 
+    return uid in SUPER_ADMINS
+
+def is_admin(uid): 
+    return uid in SUPER_ADMINS or uid in VIEWER_ADMINS
 
 
 # ======================================================
@@ -2202,6 +2205,113 @@ async def clear_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ======================================================
+# ADMIN MANAGEMENT COMMANDS
+# ======================================================
+
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اضافه کردن ادمین جدید (فقط سوپر ادمین)"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای سوپر ادمین‌ها است")
+        return
+    
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_admin user_id\n"
+                "مثال: /add_admin 123456789"
+            )
+            return
+        
+        user_id = int(context.args[0])
+        
+        # بررسی تکراری نبودن
+        if user_id in VIEWER_ADMINS:
+            await update.message.reply_text("❌ این کاربر قبلاً ادمین است")
+            return
+        
+        if user_id in SUPER_ADMINS:
+            await update.message.reply_text("❌ این کاربر سوپر ادمین است")
+            return
+        
+        # اضافه کردن به لیست
+        VIEWER_ADMINS.append(user_id)
+        
+        await update.message.reply_text(
+            f"✅ کاربر با آیدی {user_id} به ادمین‌ها اضافه شد"
+        )
+        
+    except ValueError:
+        await update.message.reply_text("❌ آیدی باید عدد باشد")
+    except Exception as e:
+        print(f"❌ خطا در add_admin: {e}")
+        await update.message.reply_text("❌ خطا در افزودن ادمین")
+
+
+async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف ادمین (فقط سوپر ادمین)"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای سوپر ادمین‌ها است")
+        return
+    
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_admin user_id\n"
+                "مثال: /remove_admin 123456789"
+            )
+            return
+        
+        user_id = int(context.args[0])
+        
+        # پیدا کردن و حذف
+        if user_id in VIEWER_ADMINS:
+            VIEWER_ADMINS.remove(user_id)
+            await update.message.reply_text(
+                f"✅ کاربر با آیدی {user_id} از ادمین‌ها حذف شد"
+            )
+        else:
+            await update.message.reply_text("❌ این کاربر در لیست ادمین‌ها نیست")
+        
+    except ValueError:
+        await update.message.reply_text("❌ آیدی باید عدد باشد")
+    except Exception as e:
+        print(f"❌ خطا در remove_admin: {e}")
+        await update.message.reply_text("❌ خطا در حذف ادمین")
+
+
+async def list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست ادمین‌ها"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای سوپر ادمین‌ها است")
+        return
+    
+    text = "👑 **لیست سوپر ادمین‌ها:**\n"
+    for i, admin_id in enumerate(SUPER_ADMINS, 1):
+        text += f"{i}. `{admin_id}`\n"
+    
+    text += "\n👤 **لیست ادمین‌های عادی:**\n"
+    if VIEWER_ADMINS:
+        for i, admin_id in enumerate(VIEWER_ADMINS, 1):
+            text += f"{i}. `{admin_id}`\n"
+    else:
+        text += "هیچ ادمین عادی وجود ندارد\n"
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def get_my_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دریافت آیدی خود"""
+    user_id = update.effective_user.id
+    await update.message.reply_text(
+        f"🆔 آیدی شما: `{user_id}`",
+        parse_mode="Markdown"
+    )
+
+
+
+# ======================================================
 # MAIN
 # ======================================================
 def main():
@@ -2254,6 +2364,10 @@ def main():
     app.add_handler(CommandHandler("remove_channel", remove_channel))
     app.add_handler(CommandHandler("list_channels", list_channels))
     app.add_handler(CommandHandler("clear_channels", clear_channels))
+    app.add_handler(CommandHandler("add_admin", add_admin))
+    app.add_handler(CommandHandler("remove_admin", remove_admin))
+    app.add_handler(CommandHandler("list_admins", list_admins))
+    app.add_handler(CommandHandler("get_my_id", get_my_id))
 
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
