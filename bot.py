@@ -2085,8 +2085,7 @@ def main():
 
 
     # در main()، بعد از هندلرهای view قبلی:
-    app.add_handler(CallbackQueryHandler(page_callback, pattern="^(page_|close_times)$"))
-    
+    app.add_handler(CallbackQueryHandler(page_callback, pattern="^(page_[a-z]+_[0-9]+|close_times)$"))    
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
