@@ -120,16 +120,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 # ======================================================
-# REQUIRED CHANNELS
+# REQUIRED CHANNELS - GLOBAL VARIABLE
 # ======================================================
-REQUIRED_CHANNELS = [
-    {"username": "@tset1386", "name": "تست", "url": "https://t.me/tset1386"},
-]
-
-# یا برای گروه‌های خصوصی با آیدی عددی:
-REQUIRED_GROUPS = []
-
-
+REQUIRED_CHANNELS = [] 
 
 
 # ======================================================
@@ -2001,24 +1994,25 @@ async def page_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_membership(user_id: int, context: ContextTypes.DEFAULT_TYPE):
     """بررسی عضویت کاربر در کانال‌های اجباری"""
     
+    # اگه کانالی تعریف نشده، مستقیم تأیید کن
+    if not REQUIRED_CHANNELS:
+        return []
+    
     not_joined = []
     
     for channel in REQUIRED_CHANNELS:
         try:
-            # تلاش برای دریافت اطلاعات عضو
             member = await context.bot.get_chat_member(chat_id=channel["username"], user_id=user_id)
             
-            # وضعیت‌های مجاز: member, administrator, creator
             if member.status not in ["member", "administrator", "creator"]:
                 not_joined.append(channel)
                 
         except Exception as e:
             print(f"❌ خطا در بررسی کانال {channel['username']}: {e}")
-            # اگه خطا خورد، فرض می‌کنیم کاربر عضو نیست
             not_joined.append(channel)
     
     return not_joined
-
+    
 
 async def membership_required(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دکوریتور برای بررسی عضویت قبل از اجرای دستورات"""
@@ -2088,6 +2082,126 @@ async def check_membership_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 # ======================================================
+# CHANNEL MANAGEMENT COMMANDS
+# ======================================================
+
+async def add_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اضافه کردن کانال اجباری جدید"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای ادمین‌ها است")
+        return
+    
+    try:
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/add_channel @username نام_کانال\n"
+                "مثال: /add_channel @my_channel کانال ورزشی"
+            )
+            return
+        
+        username = context.args[0]
+        name = " ".join(context.args[1:])
+        
+        # ساخت لینک
+        if username.startswith("@"):
+            url = f"https://t.me/{username[1:]}"
+        else:
+            url = f"https://t.me/{username}"
+            username = f"@{username}"
+        
+        # بررسی تکراری نبودن
+        for channel in REQUIRED_CHANNELS:
+            if channel["username"] == username:
+                await update.message.reply_text("❌ این کانال قبلاً اضافه شده است")
+                return
+        
+        # اضافه کردن به لیست
+        REQUIRED_CHANNELS.append({
+            "username": username,
+            "name": name,
+            "url": url
+        })
+        
+        await update.message.reply_text(
+            f"✅ کانال با موفقیت اضافه شد:\n"
+            f"📢 {name}\n"
+            f"🔗 {username}"
+        )
+        
+    except Exception as e:
+        print(f"❌ خطا در add_channel: {e}")
+        await update.message.reply_text("❌ خطا در افزودن کانال")
+
+
+async def remove_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """حذف کانال اجباری"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای ادمین‌ها است")
+        return
+    
+    try:
+        if len(context.args) != 1:
+            await update.message.reply_text(
+                "❌ فرمت:\n"
+                "/remove_channel @username\n"
+                "مثال: /remove_channel @my_channel"
+            )
+            return
+        
+        username = context.args[0]
+        if not username.startswith("@"):
+            username = f"@{username}"
+        
+        # پیدا کردن و حذف کانال
+        for i, channel in enumerate(REQUIRED_CHANNELS):
+            if channel["username"] == username:
+                removed = REQUIRED_CHANNELS.pop(i)
+                await update.message.reply_text(
+                    f"✅ کانال با موفقیت حذف شد:\n"
+                    f"📢 {removed['name']}\n"
+                    f"🔗 {removed['username']}"
+                )
+                return
+        
+        await update.message.reply_text("❌ این کانال در لیست وجود ندارد")
+        
+    except Exception as e:
+        print(f"❌ خطا در remove_channel: {e}")
+        await update.message.reply_text("❌ خطا در حذف کانال")
+
+
+async def list_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش لیست کانال‌های اجباری"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای ادمین‌ها است")
+        return
+    
+    if not REQUIRED_CHANNELS:
+        await update.message.reply_text("📭 هیچ کانال اجباری تعریف نشده است")
+        return
+    
+    text = "📋 لیست کانال‌های اجباری:\n\n"
+    for i, channel in enumerate(REQUIRED_CHANNELS, 1):
+        text += f"{i}. {channel['name']}\n"
+        text += f"   {channel['username']}\n"
+        text += f"   🔗 {channel['url']}\n\n"
+    
+    await update.message.reply_text(text)
+
+
+async def clear_channels(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پاک کردن همه کانال‌های اجباری"""
+    if not is_super(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای ادمین‌ها است")
+        return
+    
+    REQUIRED_CHANNELS.clear()
+    await update.message.reply_text("✅ همه کانال‌های اجباری پاک شدند")
+
+
+
+# ======================================================
 # MAIN
 # ======================================================
 def main():
@@ -2136,6 +2250,11 @@ def main():
     app.add_handler(CommandHandler("show_times", show_times))
     app.add_handler(CommandHandler("add_shared_time", add_shared_time))
     app.add_handler(CommandHandler("remove_shared_time", remove_shared_time))
+    app.add_handler(CommandHandler("add_channel", add_channel))
+    app.add_handler(CommandHandler("remove_channel", remove_channel))
+    app.add_handler(CommandHandler("list_channels", list_channels))
+    app.add_handler(CommandHandler("clear_channels", clear_channels))
+
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
 
