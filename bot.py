@@ -276,20 +276,42 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ─────────── time validation ───────────
     if sport == "futsal":
-        if not group or group not in RAM_TIMES["futsal"]:
-            await update.message.reply_text("❌ خطا در گروه فوتسال")
-            context.user_data.clear()
-            return
-
-        if idx >= len(RAM_TIMES["futsal"][group]):
+        # ساخت لیست کلی مثل time_select
+        all_times = []
+        for g in "ABCDEFGHIJ":
+            for t in RAM_TIMES["futsal"][g]:
+                if not is_time_expired(t):
+                    t_copy = t.copy()
+                    t_copy["group"] = g
+                    all_times.append(t_copy)
+        
+        if idx >= len(all_times):
             await update.message.reply_text("❌ تایم فوتسال نامعتبر است")
             context.user_data.clear()
             return
 
-        slot = RAM_TIMES["futsal"][group][idx]
+        # دریافت تایم از لیست کلی
+        selected_time = all_times[idx]
+        real_group = selected_time.get("group")  # گروه واقعی این تایم
+        
+        # پیدا کردن ایندکس واقعی در گروه خودش
+        real_idx_in_group = None
+        for i, t in enumerate(RAM_TIMES["futsal"][real_group]):
+            if (t["date_obj"] == selected_time["date_obj"] and 
+                t["start"] == selected_time["start"] and 
+                t["end"] == selected_time["end"]):
+                real_idx_in_group = i
+                break
+        
+        if real_idx_in_group is None:
+            await update.message.reply_text("❌ خطا در یافتن تایم")
+            context.user_data.clear()
+            return
+
+        slot = RAM_TIMES["futsal"][real_group][real_idx_in_group]
         time_date = slot.get("date_obj")
         
-        # ✅ بررسی مجدد قفل تایم (ممکن است در فاصله انتخاب تا ارسال شماره قفل شده باشد)
+        # بررسی قفل تایم
         if is_time_locked(time_date, slot.get("start")):
             j_date = jdatetime.date.fromgregorian(date=time_date)
             await update.message.reply_text(
@@ -301,19 +323,22 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             return
         
-        time_key = f"time_{idx}"
-        registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(time_key, {})
+        time_key = f"time_{real_idx_in_group}"
+        registrations = RAM_REGISTRATIONS["futsal"][real_group].setdefault(time_key, {})
 
     elif sport == "shared":
-        if idx >= len(RAM_TIMES["shared"]):
+        # ساخت all_times مثل time_select
+        all_times = [t for t in RAM_TIMES["shared"] if not is_time_expired(t)]
+        
+        if idx >= len(all_times):
             await update.message.reply_text("❌ تایم اشتراکی نامعتبر است")
             context.user_data.clear()
             return
 
-        slot = RAM_TIMES["shared"][idx]
+        slot = all_times[idx]
         time_date = slot.get("date_obj")
         
-        # ✅ بررسی مجدد قفل تایم
+        # بررسی مجدد قفل تایم
         if is_time_locked(time_date, slot.get("start")):
             j_date = jdatetime.date.fromgregorian(date=time_date)
             await update.message.reply_text(
@@ -329,15 +354,18 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         registrations = RAM_REGISTRATIONS["shared"].setdefault(time_key, {})
 
     else:  # بسکتبال و والیبال
-        if idx >= len(RAM_TIMES[sport]):
+        # ساخت all_times مثل time_select
+        all_times = [t for t in RAM_TIMES[sport] if not is_time_expired(t)]
+        
+        if idx >= len(all_times):
             await update.message.reply_text("❌ تایم نامعتبر است")
             context.user_data.clear()
             return
 
-        slot = RAM_TIMES[sport][idx]
+        slot = all_times[idx]
         time_date = slot.get("date_obj")
         
-        # ✅ بررسی مجدد قفل تایم
+        # بررسی مجدد قفل تایم
         if is_time_locked(time_date, slot.get("start")):
             j_date = jdatetime.date.fromgregorian(date=time_date)
             sport_name = {
