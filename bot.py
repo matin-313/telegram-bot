@@ -287,17 +287,44 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         slot = RAM_TIMES["futsal"][group][idx]
+        time_date = slot.get("date_obj")
+        
+        # ✅ بررسی مجدد قفل تایم (ممکن است در فاصله انتخاب تا ارسال شماره قفل شده باشد)
+        if is_time_locked(time_date, slot.get("start")):
+            j_date = jdatetime.date.fromgregorian(date=time_date)
+            await update.message.reply_text(
+                f"🔒 **ثبت‌نام برای این تایم بسته شد**\n\n"
+                f"📅 تاریخ: {j_date.strftime('%Y/%m/%d')}\n"
+                f"⏰ ساعت: {slot['start']}\n\n"
+                f"❌ کمتر از 30 دقیقه به شروع تایم مونده!"
+            )
+            context.user_data.clear()
+            return
+        
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS["futsal"][group].setdefault(time_key, {})
 
     elif sport == "shared":
-        # ✅ بخش اشتراکی - validation
         if idx >= len(RAM_TIMES["shared"]):
             await update.message.reply_text("❌ تایم اشتراکی نامعتبر است")
             context.user_data.clear()
             return
 
         slot = RAM_TIMES["shared"][idx]
+        time_date = slot.get("date_obj")
+        
+        # ✅ بررسی مجدد قفل تایم
+        if is_time_locked(time_date, slot.get("start")):
+            j_date = jdatetime.date.fromgregorian(date=time_date)
+            await update.message.reply_text(
+                f"🔒 **ثبت‌نام برای این تایم اشتراکی بسته شد**\n\n"
+                f"📅 تاریخ: {j_date.strftime('%Y/%m/%d')}\n"
+                f"⏰ ساعت: {slot['start']}\n\n"
+                f"❌ کمتر از 30 دقیقه به شروع تایم مونده!"
+            )
+            context.user_data.clear()
+            return
+        
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS["shared"].setdefault(time_key, {})
 
@@ -308,6 +335,24 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         slot = RAM_TIMES[sport][idx]
+        time_date = slot.get("date_obj")
+        
+        # ✅ بررسی مجدد قفل تایم
+        if is_time_locked(time_date, slot.get("start")):
+            j_date = jdatetime.date.fromgregorian(date=time_date)
+            sport_name = {
+                "basketball": "بسکتبال",
+                "volleyball": "والیبال"
+            }.get(sport, sport)
+            await update.message.reply_text(
+                f"🔒 **ثبت‌نام برای این تایم {sport_name} بسته شد**\n\n"
+                f"📅 تاریخ: {j_date.strftime('%Y/%m/%d')}\n"
+                f"⏰ ساعت: {slot['start']}\n\n"
+                f"❌ کمتر از 30 دقیقه به شروع تایم مونده!"
+            )
+            context.user_data.clear()
+            return
+        
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS[sport].setdefault(time_key, {})
 
@@ -754,12 +799,25 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             time_info = all_times[idx]
             time_date = time_info.get("date_obj")
             
+            # بررسی تاریخ (فقط روز برگزاری)
             if time_date and time_date > today:
                 j_date = jdatetime.date.fromgregorian(date=time_date)
                 await query.edit_message_text(
                     f"⏰ مهلت ثبت‌نام برای این تایم هنوز شروع نشده!\n"
                     f"📅 تاریخ تایم: {j_date.strftime('%Y/%m/%d')}\n"
                     f"❌ فقط در روز برگزاری می‌توانید ثبت‌نام کنید"
+                )
+                return
+            
+            # ✅ بررسی قفل تایم (5 دقیقه قبل)
+            if is_time_locked(time_date, time_info.get("start")):
+                j_date = jdatetime.date.fromgregorian(date=time_date)
+                await query.edit_message_text(
+                    f"🔒 **ثبت‌نام برای این تایم بسته شد**\n\n"
+                    f"📅 تاریخ: {j_date.strftime('%Y/%m/%d')}\n"
+                    f"⏰ ساعت: {time_info['start']}\n\n"
+                    f"❌ کمتر از 30 دقیقه به شروع تایم مونده!\n"
+                    f"برای ثبت‌نام زودتر اقدام کنید."
                 )
                 return
 
@@ -779,6 +837,7 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
             time_info = RAM_TIMES[sport][idx]
             time_date = time_info.get("date_obj")
             
+            # بررسی تاریخ (فقط روز برگزاری)
             if time_date and time_date > today:
                 j_date = jdatetime.date.fromgregorian(date=time_date)
                 sport_name = {
@@ -791,6 +850,24 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"⏰ مهلت ثبت‌نام برای این تایم {sport_name} هنوز شروع نشده!\n"
                     f"📅 تاریخ تایم: {j_date.strftime('%Y/%m/%d')}\n"
                     f"❌ فقط در روز برگزاری می‌توانید ثبت‌نام کنید"
+                )
+                return
+            
+            # ✅ بررسی قفل تایم (5 دقیقه قبل)
+            if is_time_locked(time_date, time_info.get("start")):
+                j_date = jdatetime.date.fromgregorian(date=time_date)
+                sport_name = {
+                    "basketball": "بسکتبال",
+                    "volleyball": "والیبال",
+                    "shared": "اشتراکی"
+                }.get(sport, sport)
+                
+                await query.edit_message_text(
+                    f"🔒 **ثبت‌نام برای این تایم {sport_name} بسته شد**\n\n"
+                    f"📅 تاریخ: {j_date.strftime('%Y/%m/%d')}\n"
+                    f"⏰ ساعت: {time_info['start']}\n\n"
+                    f"❌ کمتر از 30 دقیقه به شروع تایم مونده!\n"
+                    f"برای ثبت‌نام زودتر اقدام کنید."
                 )
                 return
 
@@ -2812,6 +2889,40 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ آیدی کاربر باید عدد باشد")
     except Exception as e:
         await update.message.reply_text(f"❌ خطا در ارسال پاسخ: {e}")
+
+
+
+
+# ======================================================
+# TIME LOCK UTILS
+# ======================================================
+
+def is_time_locked(time_date, time_start):
+    """
+    بررسی اینکه تایم قفل شده یا نه
+    اگر کمتر از 5 دقیقه به شروع مونده باشه، قفل است
+    """
+    if not time_date or not time_start:
+        return False
+    
+    # ترکیب تاریخ و زمان شروع
+    time_start_str = f"{time_date.isoformat()} {time_start}"
+    try:
+        # تبدیل به datetime
+        start_datetime = datetime.strptime(time_start_str, "%Y-%m-%d %H:%M")
+        now = datetime.now()
+        
+        # محاسبه اختلاف زمان
+        time_diff = (start_datetime - now).total_seconds() / 60  # به دقیقه
+        
+        # اگر کمتر از 5 دقیقه مونده باشه، قفل است
+        return time_diff < 30
+        
+    except Exception as e:
+        print(f"❌ خطا در بررسی قفل تایم: {e}")
+        return False
+
+
 
 
 # ======================================================
