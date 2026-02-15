@@ -133,6 +133,13 @@ REQUIRED_CHANNELS = []
 USERS = {}  # key: user_id, value: {"first_name": name, "username": username, "date": datetime}
 
 
+
+# ======================================================
+# REPLY TRACKING - GLOBAL VARIABLE
+# ======================================================
+REPLYING_TO = {}  # key: admin_id, value: user_id
+
+
 # ======================================================
 # normalize phone
 # ======================================================
@@ -2776,9 +2783,10 @@ async def reply_to_user_callback(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     user_id = int(data.split("_")[1])
+    admin_id = query.from_user.id
     
-    # ذخیره آیدی کاربر در context.user_data برای استفاده در مرحله بعد
-    context.user_data["replying_to"] = user_id
+    # ذخیره آیدی کاربر در دیکشنری سراسری
+    REPLYING_TO[admin_id] = user_id
     
     await query.edit_message_text(
         text=query.message.text + "\n\n✏️ **لطفاً پاسخ خود را بنویسید:**",
@@ -2791,16 +2799,15 @@ async def reply_to_user_callback(update: Update, context: ContextTypes.DEFAULT_T
         parse_mode="Markdown"
     )
 
-
 async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """دریافت پاسخ ادمین و ارسال به کاربر"""
     admin_id = update.effective_user.id
     
     # بررسی اینکه آیا این ادمین در حال پاسخ دادن است
-    if "replying_to" not in context.user_data:
+    if admin_id not in REPLYING_TO:
         return
     
-    user_id = context.user_data["replying_to"]
+    user_id = REPLYING_TO[admin_id]
     reply_text = update.message.text
     
     # اطلاعات ادمین
@@ -2826,17 +2833,18 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(f"❌ خطا در ارسال پاسخ: {e}")
     
     # پاک کردن وضعیت پاسخ
-    context.user_data.pop("replying_to", None)
+    del REPLYING_TO[admin_id]
 
 
 async def cancel_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """لغو پاسخ به کاربر"""
-    if "replying_to" in context.user_data:
-        user_id = context.user_data.pop("replying_to")
+    admin_id = update.effective_user.id
+    
+    if admin_id in REPLYING_TO:
+        user_id = REPLYING_TO.pop(admin_id)
         await update.message.reply_text(f"❌ پاسخ به کاربر {user_id} لغو شد.")
     else:
         await update.message.reply_text("شما در حال پاسخ دادن به کسی نیستید.")
-
 
 
 # ======================================================
