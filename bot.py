@@ -2720,11 +2720,9 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         admin_text += f"📱 **یوزرنیم:** @{username}\n"
     
     admin_text += f"\n💬 **متن پیام:**\n{message_text}\n\n"
-    admin_text += f"➖➖➖➖➖➖➖➖➖\n"
-    admin_text += f"🔽 برای پاسخ، روی دکمه زیر کلیک کنید:"
-    
-    # دکمه پاسخ
-    keyboard = [[InlineKeyboardButton("📤 پاسخ به این کاربر", callback_data=f"reply_{user_id}")]]
+    admin_text += "➖➖➖➖➖➖➖➖➖\n"
+    admin_text += "📌 **برای پاسخ از دستور زیر استفاده کنید:**\n"
+    admin_text += f"`/reply {user_id} متن پاسخ شما`"
     
     # ارسال به همه ادمین‌ها
     sent_count = 0
@@ -2733,7 +2731,6 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             await context.bot.send_message(
                 chat_id=admin_id,
                 text=admin_text,
-                reply_markup=InlineKeyboardMarkup(keyboard),
                 parse_mode="Markdown"
             )
             sent_count += 1
@@ -2773,49 +2770,31 @@ async def cancel_contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-async def reply_to_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر پاسخ ادمین به کاربر"""
-    query = update.callback_query
-    await query.answer()
-    
-    data = query.data
-    if not data.startswith("reply_"):
-        return
-    
-    user_id = int(data.split("_")[1])
-    admin_id = query.from_user.id
-    
-    # ذخیره آیدی کاربر در دیکشنری سراسری
-    REPLYING_TO[admin_id] = user_id
-    
-    await query.edit_message_text(
-        text=query.message.text + "\n\n✏️ **لطفاً پاسخ خود را بنویسید:**",
-        parse_mode="Markdown"
-    )
-    
-    await query.message.reply_text(
-        f"✏️ پاسخ خود به کاربر (`{user_id}`) را بنویسید.\n"
-        "برای لغو /cancel_reply را بزنید.",
-        parse_mode="Markdown"
-    )
 
-async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دریافت پاسخ ادمین و ارسال به کاربر"""
-    admin_id = update.effective_user.id
-    
-    # بررسی اینکه آیا این ادمین در حال پاسخ دادن است
-    if admin_id not in REPLYING_TO:
+async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پاسخ به کاربر (فقط ادمین‌ها)"""
+    if not is_admin(update.effective_user.id):
+        await update.message.reply_text("❌ این دستور فقط برای ادمین‌ها است")
         return
     
-    user_id = REPLYING_TO[admin_id]
-    reply_text = update.message.text
-    
-    # اطلاعات ادمین
-    admin = update.effective_user
-    admin_name = admin.full_name
-    
-    # ارسال پاسخ به کاربر
     try:
+        if len(context.args) < 2:
+            await update.message.reply_text(
+                "❌ **فرمت صحیح:**\n"
+                "`/reply user_id متن پاسخ`\n\n"
+                "**مثال:**\n"
+                "`/reply 123456789 سلام دوست عزیز، پیامت دریافت شد`"
+            )
+            return
+        
+        user_id = int(context.args[0])
+        reply_text = " ".join(context.args[1:])
+        
+        # اطلاعات ادمین
+        admin = update.effective_user
+        admin_name = admin.full_name
+        
+        # ارسال پاسخ به کاربر
         await context.bot.send_message(
             chat_id=user_id,
             text=(
@@ -2827,24 +2806,12 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode="Markdown"
         )
         
-        await update.message.reply_text("✅ پاسخ شما با موفقیت به کاربر ارسال شد.")
+        await update.message.reply_text(f"✅ پاسخ شما با موفقیت به کاربر `{user_id}` ارسال شد.")
         
+    except ValueError:
+        await update.message.reply_text("❌ آیدی کاربر باید عدد باشد")
     except Exception as e:
         await update.message.reply_text(f"❌ خطا در ارسال پاسخ: {e}")
-    
-    # پاک کردن وضعیت پاسخ
-    del REPLYING_TO[admin_id]
-
-
-async def cancel_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """لغو پاسخ به کاربر"""
-    admin_id = update.effective_user.id
-    
-    if admin_id in REPLYING_TO:
-        user_id = REPLYING_TO.pop(admin_id)
-        await update.message.reply_text(f"❌ پاسخ به کاربر {user_id} لغو شد.")
-    else:
-        await update.message.reply_text("شما در حال پاسخ دادن به کسی نیستید.")
 
 
 # ======================================================
@@ -2908,6 +2875,7 @@ def main():
     app.add_handler(CommandHandler("user_stats", user_stats))
     app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CommandHandler("broadcast_help", broadcast_help))
+    app.add_handler(CommandHandler("reply", reply_command))
 
     # ✅ دستورهای یونیک برای گروه‌های فوتسال A تا J
     for group in FUTSAL_GROUPS.keys():
@@ -2995,15 +2963,9 @@ def main():
         handle_user_message
     ))
     app.add_handler(CommandHandler("cancel", cancel_contact))
-    app.add_handler(CallbackQueryHandler(reply_to_user_callback, pattern="^reply_"))
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_admin_reply
-    ))
-    app.add_handler(CommandHandler("cancel_reply", cancel_reply))
+
 
     
-
 
     # JobQueue برای گزارش شبانه
     app.job_queue.run_daily(
