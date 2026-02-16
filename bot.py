@@ -1,8 +1,6 @@
 # ======================================================
 # IMPORTS
 # ======================================================
-
-
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
@@ -23,6 +21,7 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+
 # ======================================================
 # CONFIG
 # ======================================================
@@ -51,7 +50,6 @@ RAM_PLAYERS = {
 
 }
 
-# ✅ این مقداردهی اولیه را در ابتدای main() اضافه کن
 def initialize_ram():
     """مقداردهی اولیه ساختارهای RAM"""
     global RAM_PLAYERS, RAM_TIMES, RAM_REGISTRATIONS
@@ -94,7 +92,6 @@ RAM_REGISTRATIONS = {
 # ======================================================
 # RAM TIMES (تایم‌ها فقط در حافظه)
 # ======================================================
-
 RAM_TIMES = {
     "futsal": {g: [] for g in "ABCDEFGHIJ"},  # group -> list of times with date
     "basketball": [],
@@ -722,7 +719,6 @@ async def daily_report(context: ContextTypes.DEFAULT_TYPE):
 # ======================================================
 #  sport select
 # ======================================================
-
 async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # بررسی عضویت
@@ -746,8 +742,11 @@ async def sport_text_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["page"] = 0  # صفحه اول
 
     await show_times_page(update, context, sport, 0)
+    
 
-
+# ======================================================
+# show times page
+# ======================================================
 async def show_times_page(update: Update, context: ContextTypes.DEFAULT_TYPE, sport: str, page: int):
     """نمایش تایم‌های یک صفحه خاص"""
     
@@ -833,7 +832,6 @@ async def show_times_page(update: Update, context: ContextTypes.DEFAULT_TYPE, sp
 # ======================================================
 #  time select
 # ======================================================
-
 async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -953,6 +951,9 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ======================================================
+#  add basketball
+# ======================================================
 async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
@@ -996,7 +997,9 @@ async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-
+# ======================================================
+#  add volleyball
+# ======================================================
 async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
@@ -1040,8 +1043,9 @@ async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-
-
+# ======================================================
+#  add basketball time
+# ======================================================
 async def add_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
@@ -1097,7 +1101,9 @@ async def add_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ فرمت: /add_basketball_time تاریخ start end cap")
 
 
-
+# ======================================================
+#  add volleyball time
+# ======================================================
 async def add_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
@@ -1147,7 +1153,9 @@ async def add_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 
-
+# ======================================================
+#  add group player
+# ======================================================
 async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
     if not is_super(update.effective_user.id):
         return
@@ -1207,7 +1215,9 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         )
 
 
-
+# ======================================================
+#  add group time
+# ======================================================
 async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
     if not is_super(update.effective_user.id):
         return
@@ -1258,6 +1268,9 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
         )
 
 
+# ======================================================
+#  cleanup expired times
+# ======================================================
 async def cleanup_expired_times():
     """پاک کردن تایم‌های منقضی شده و ثبت‌نام‌های مربوطه"""
     today = date.today()
@@ -1304,6 +1317,9 @@ async def cleanup_expired_times():
         del RAM_TIMES["volleyball"][i]
 
 
+# ======================================================
+#  show players
+# ======================================================
 async def show_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_super(update.effective_user.id):
         return
@@ -1340,7 +1356,9 @@ async def show_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text or "هیچ بازیکنی ثبت نشده")
 
 
-
+# ======================================================
+#  remove group player
+# ======================================================
 async def remove_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
     """حذف بازیکن از گروه فوتسال با شماره تلفن"""
     if not is_super(update.effective_user.id):
@@ -1385,7 +1403,9 @@ async def remove_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
 
 
-
+# ======================================================
+#  remove basketball
+# ======================================================
 async def remove_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف بازیکن بسکتبال با شماره تلفن"""
     if not is_super(update.effective_user.id):
@@ -1430,7 +1450,9 @@ async def remove_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-
+# ======================================================
+#  remove volleyball
+# ======================================================
 async def remove_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف بازیکن والیبال با شماره تلفن"""
     if not is_super(update.effective_user.id):
@@ -1475,7 +1497,9 @@ async def remove_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-
+# ======================================================
+#  remove group time
+# ======================================================
 async def remove_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, group: str):
     """حذف تایم از گروه فوتسال با شماره ایندکس"""
     if not is_super(update.effective_user.id):
@@ -1533,6 +1557,10 @@ async def remove_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             f"فرمت: /remove{group}time ایندکس"
         )
 
+
+# ======================================================
+#  reindex futsal times
+# ======================================================
 async def reindex_futsal_times(group: str):
     """به‌روزرسانی ایندکس ثبت‌نام‌ها بعد از حذف تایم"""
     new_registrations = {}
@@ -1547,7 +1575,9 @@ async def reindex_futsal_times(group: str):
     RAM_REGISTRATIONS["futsal"][group] = new_registrations
 
 
-
+# ======================================================
+#  remove basketball time
+# ======================================================
 async def remove_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف تایم بسکتبال با شماره ایندکس"""
     if not is_super(update.effective_user.id):
@@ -1606,6 +1636,9 @@ async def remove_basketball_time(update: Update, context: ContextTypes.DEFAULT_T
         )
 
 
+# ======================================================
+#  remove volleyball time
+# ======================================================
 async def remove_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """حذف تایم والیبال با شماره ایندکس"""
     if not is_super(update.effective_user.id):
@@ -1667,7 +1700,6 @@ async def remove_volleyball_time(update: Update, context: ContextTypes.DEFAULT_T
 # ======================================================
 # SHARED TIMES COMMANDS
 # ======================================================
-
 async def add_shared_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """افزودن تایم اشتراکی"""
     if not is_super(update.effective_user.id):
@@ -2992,6 +3024,9 @@ def is_time_locked(time_date, time_start):
 
 
 
+# ======================================================
+# help menu
+# ======================================================
 async def help_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش منوی راهنما"""
     text = update.message.text
@@ -3013,6 +3048,9 @@ async def help_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ======================================================
+# help admin password
+# ======================================================
 async def help_admin_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """درخواست رمز برای دسترسی به راهنمای ادمین"""
     query = update.callback_query
@@ -3028,7 +3066,9 @@ async def help_admin_password(update: Update, context: ContextTypes.DEFAULT_TYPE
         parse_mode="Markdown"
     )
 
-
+# ======================================================
+# check admin password
+# ======================================================
 async def check_admin_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """بررسی رمز عبور و نمایش راهنمای ادمین"""
     user_id = update.effective_user.id
@@ -3053,6 +3093,9 @@ async def check_admin_password(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data.pop("waiting_for_admin_password", None)
 
 
+# ======================================================
+# show admin help
+# ======================================================
 async def show_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش راهنمای ادمین با صفحه‌بندی"""
     admin_help_pages = [
@@ -3148,7 +3191,9 @@ async def show_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 
-
+# ======================================================
+# show user help
+# ======================================================
 async def show_user_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """نمایش راهنمای کاربران با صفحه‌بندی"""
     user_help_pages = [
@@ -3213,7 +3258,9 @@ async def show_user_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-
+# ======================================================
+# help callback handler
+# ======================================================
 async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر همه دکمه‌های راهنما"""
     query = update.callback_query
@@ -3307,6 +3354,9 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         )
 
 
+# ======================================================
+# handle all messages
+# ======================================================
 async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """هندلر یکپارچه برای همه پیام‌های متنی"""
     user_id = update.effective_user.id
@@ -3387,6 +3437,9 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
+# ======================================================
+# help acknowledge callback
+# ======================================================
 async def help_acknowledge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """وقتی کاربر تایید کرد که راهنما رو دیده"""
     query = update.callback_query
