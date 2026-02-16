@@ -276,7 +276,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ─────────── time validation ───────────
     if sport == "futsal":
-        # ساخت لیست کلی مثل time_select
+        # ساخت all_times مثل time_select برای پیدا کردن تایم درست
         all_times = []
         for g in "ABCDEFGHIJ":
             for t in RAM_TIMES["futsal"][g]:
@@ -290,25 +290,25 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             return
 
-        # دریافت تایم از لیست کلی
+        # پیدا کردن تایم درست از all_times
         selected_time = all_times[idx]
-        real_group = selected_time.get("group")  # گروه واقعی این تایم
+        real_group = selected_time.get("group")
         
-        # پیدا کردن ایندکس واقعی در گروه خودش
-        real_idx_in_group = None
+        # پیدا کردن ایندکس واقعی در گروه
+        real_idx = None
         for i, t in enumerate(RAM_TIMES["futsal"][real_group]):
             if (t["date_obj"] == selected_time["date_obj"] and 
                 t["start"] == selected_time["start"] and 
                 t["end"] == selected_time["end"]):
-                real_idx_in_group = i
+                real_idx = i
                 break
         
-        if real_idx_in_group is None:
+        if real_idx is None:
             await update.message.reply_text("❌ خطا در یافتن تایم")
             context.user_data.clear()
             return
 
-        slot = RAM_TIMES["futsal"][real_group][real_idx_in_group]
+        slot = RAM_TIMES["futsal"][real_group][real_idx]
         time_date = slot.get("date_obj")
         
         # بررسی قفل تایم
@@ -323,7 +323,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data.clear()
             return
         
-        time_key = f"time_{real_idx_in_group}"
+        time_key = f"time_{real_idx}"
         registrations = RAM_REGISTRATIONS["futsal"][real_group].setdefault(time_key, {})
 
     elif sport == "shared":
@@ -338,7 +338,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         slot = all_times[idx]
         time_date = slot.get("date_obj")
         
-        # بررسی مجدد قفل تایم
         if is_time_locked(time_date, slot.get("start")):
             j_date = jdatetime.date.fromgregorian(date=time_date)
             await update.message.reply_text(
@@ -365,7 +364,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         slot = all_times[idx]
         time_date = slot.get("date_obj")
         
-        # بررسی مجدد قفل تایم
         if is_time_locked(time_date, slot.get("start")):
             j_date = jdatetime.date.fromgregorian(date=time_date)
             sport_name = {
@@ -837,7 +835,7 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
             
-            # ✅ بررسی قفل تایم (5 دقیقه قبل)
+            # بررسی قفل تایم
             if is_time_locked(time_date, time_info.get("start")):
                 j_date = jdatetime.date.fromgregorian(date=time_date)
                 await query.edit_message_text(
@@ -853,16 +851,18 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["group"] = group
         context.user_data["time_index"] = idx
 
-    else:
+    else:  # بسکتبال، والیبال، اشتراکی
         try:
             idx = int(data[1])
         except:
             await query.edit_message_text("❌ خطا در انتخاب تایم")
             return
 
-        # بررسی تاریخ تایم
-        if idx < len(RAM_TIMES[sport]):
-            time_info = RAM_TIMES[sport][idx]
+        # ✅ ساخت all_times مثل show_times_page
+        all_times = [t for t in RAM_TIMES[sport] if not is_time_expired(t)]
+
+        if idx < len(all_times):
+            time_info = all_times[idx]  # ✅ استفاده از all_times بجای RAM_TIMES
             time_date = time_info.get("date_obj")
             
             # بررسی تاریخ (فقط روز برگزاری)
@@ -881,7 +881,7 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
             
-            # ✅ بررسی قفل تایم (5 دقیقه قبل)
+            # بررسی قفل تایم
             if is_time_locked(time_date, time_info.get("start")):
                 j_date = jdatetime.date.fromgregorian(date=time_date)
                 sport_name = {
