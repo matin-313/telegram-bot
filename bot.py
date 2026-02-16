@@ -222,8 +222,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
 
-    # بررسی میکنیم آیا کاربر قبلاً راهنما رو دیده یا نه
-    # می‌تونیم این رو در USERS ذخیره کنیم
+    # بررسی میکنیم آیا کاربر جدید هست یا نه
     is_new = False
     
     # اگه کاربر قبلاً ذخیره نشده بود، ذخیره کن
@@ -234,8 +233,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "username": user.username,
             "full_name": user.full_name,
             "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "language": user.language_code
+            "language": user.language_code,
+            "help_seen": False  # ← اضافه کردن فیلد help_seen
         }
+        is_new = True  # ✅ اینجا is_new رو True می‌کنیم
         print(f"✅ کاربر جدید: {user.full_name} ({user_id})")
 
     # اگه کاربر جدید باشه یا راهنما رو ندیده باشه
@@ -281,7 +282,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resize_keyboard=True
         )
     )
-
 
 # ======================================================
 # REGISTER TIME
