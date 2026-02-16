@@ -140,6 +140,14 @@ USERS = {}  # key: user_id, value: {"first_name": name, "username": username, "d
 REPLYING_TO = {}  # key: admin_id, value: user_id
 
 
+
+# ======================================================
+# HELP SYSTEM
+# ======================================================
+ADMIN_PASSWORD = "admin5686"  
+
+
+
 # ======================================================
 # normalize phone
 # ======================================================
@@ -233,8 +241,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
         ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"],
-        ["📨 تماس با ادمین"]  
-
+        ["📨 تماس با ادمین", "❓ راهنما"]  
     ]
 
     await update.message.reply_text(
@@ -2952,6 +2959,320 @@ def is_time_locked(time_date, time_start):
 
 
 
+async def help_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش منوی راهنما"""
+    text = update.message.text
+    
+    if text != "❓ راهنما":
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("👤 راهنمای کاربران", callback_data="help_user")],
+        [InlineKeyboardButton("👑 راهنمای ادمین", callback_data="help_admin_password")],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data="help_back")]
+    ]
+    
+    await update.message.reply_text(
+        "📚 **راهنمای ربات**\n\n"
+        "لطفاً یکی از گزینه‌ها را انتخاب کنید:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def help_admin_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """درخواست رمز برای دسترسی به راهنمای ادمین"""
+    query = update.callback_query
+    await query.answer()
+    
+    # ذخیره وضعیت در context.user_data
+    context.user_data["waiting_for_admin_password"] = True
+    
+    await query.edit_message_text(
+        "🔐 **ورود به بخش ادمین**\n\n"
+        "لطفاً رمز عبور را وارد کنید:\n"
+        "(برای لغو /cancel را بزنید)",
+        parse_mode="Markdown"
+    )
+
+
+async def check_admin_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """بررسی رمز عبور و نمایش راهنمای ادمین"""
+    user_id = update.effective_user.id
+    
+    # اگه کاربر در حالت انتظار رمز نیست، ادامه نده
+    if not context.user_data.get("waiting_for_admin_password"):
+        return
+    
+    password = update.message.text.strip()
+    
+    if password == ADMIN_PASSWORD:
+        # رمز درست است
+        context.user_data.pop("waiting_for_admin_password", None)
+        await show_admin_help(update, context)
+    else:
+        # رمز اشتباه است
+        await update.message.reply_text(
+            "❌ **رمز عبور اشتباه است!**\n\n"
+            "دسترسی غیرمجاز به بخش ادمین ثبت شد.",
+            parse_mode="Markdown"
+        )
+        context.user_data.pop("waiting_for_admin_password", None)
+
+
+async def show_admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش راهنمای ادمین با صفحه‌بندی"""
+    admin_help_pages = [
+        # صفحه 1 - مقدمه
+        "👑 **راهنمای ادمین - صفحه 1/6**\n\n"
+        "🌟 **خوش آمدید به بخش مدیریت ربات**\n\n"
+        "این راهنما به شما کمک می‌کند تا با تمام دستورات و امکانات مدیریتی آشنا شوید.\n\n"
+        "➖➖➖➖➖➖➖➖➖\n"
+        "از دکمه‌های زیر برای مشاهده صفحات استفاده کنید.",
+        
+        # صفحه 2 - مدیریت بازیکنان
+        "👑 **راهنمای ادمین - صفحه 2/6**\n\n"
+        "📋 **مدیریت بازیکنان فوتسال:**\n\n"
+        "• `/addAplayer` تا `/addJplayer` - اضافه کردن بازیکن به گروه\n"
+        "  مثال: `/addAplayer علی محمدی 09123456789`\n\n"
+        "• `/removeAplayer` تا `/removeJplayer` - حذف بازیکن از گروه\n"
+        "  مثال: `/removeAplayer 09123456789`\n\n"
+        "• `/show_players` - نمایش لیست همه بازیکنان",
+        
+        # صفحه 3 - مدیریت بازیکنان دیگر رشته‌ها
+        "👑 **راهنمای ادمین - صفحه 3/6**\n\n"
+        "🏀 **مدیریت بازیکنان بسکتبال:**\n\n"
+        "• `/add_basketball` - اضافه کردن بازیکن بسکتبال\n"
+        "  مثال: `/add_basketball رضا کریمی 09123456789`\n\n"
+        "• `/remove_basketball` - حذف بازیکن بسکتبال\n"
+        "  مثال: `/remove_basketball 09123456789`\n\n"
+        "🏐 **مدیریت بازیکنان والیبال:**\n\n"
+        "• `/add_volleyball` - اضافه کردن بازیکن والیبال\n"
+        "• `/remove_volleyball` - حذف بازیکن والیبال",
+        
+        # صفحه 4 - مدیریت تایم‌ها
+        "👑 **راهنمای ادمین - صفحه 4/6**\n\n"
+        "⏰ **مدیریت تایم‌ها:**\n\n"
+        "⚽ **فوتسال:**\n"
+        "• `/addAtime` تا `/addJtime` تاریخ start end ظرفیت\n"
+        "  مثال: `/addAtime 1404/11/23 18:00 19:00 15`\n\n"
+        "🏀 **بسکتبال:**\n"
+        "• `/add_basketball_time` تاریخ start end ظرفیت\n\n"
+        "🏐 **والیبال:**\n"
+        "• `/add_volleyball_time` تاریخ start end ظرفیت\n\n"
+        "🤝 **اشتراکی:**\n"
+        "• `/add_shared_time` تاریخ start end ظرفیت",
+        
+        # صفحه 5 - دستورات حذف و مشاهده
+        "👑 **راهنمای ادمین - صفحه 5/6**\n\n"
+        "🗑️ **حذف تایم‌ها:**\n\n"
+        "• `/show_times` - نمایش لیست تایم‌ها با ایندکس\n"
+        "• `/removeAtime 0` - حذف تایم با ایندکس\n"
+        "• `/remove_basketball_time 0`\n"
+        "• `/remove_volleyball_time 0`\n"
+        "• `/remove_shared_time 0`\n\n"
+        "📊 **گزارش‌گیری:**\n\n"
+        "• `/today` - ثبت‌نام‌های امروز\n"
+        "• گزارش خودکار شبانه ساعت ۲۳:۵۹",
+        
+        # صفحه 6 - مدیریت و ارتباطات
+        "👑 **راهنمای ادمین - صفحه 6/6**\n\n"
+        "👥 **مدیریت کاربران:**\n\n"
+        "• `/list_users` - لیست همه کاربران\n"
+        "• `/user_stats` - آمار کاربران\n\n"
+        "📢 **ارسال پیام همگانی:**\n\n"
+        "• `/broadcast متن` - ارسال به همه\n"
+        "• `/broadcast -b متن_دکمه لینک متن` - با دکمه\n\n"
+        "👤 **مدیریت ادمین‌ها:**\n\n"
+        "• `/add_admin user_id` - اضافه کردن ادمین\n"
+        "• `/remove_admin user_id` - حذف ادمین\n"
+        "• `/list_admins` - لیست ادمین‌ها\n\n"
+        "📢 **مدیریت کانال‌ها:**\n\n"
+        "• `/add_channel @username نام`\n"
+        "• `/remove_channel @username`\n"
+        "• `/list_channels`"
+    ]
+    
+    # ذخیره صفحات در context.user_data
+    context.user_data["admin_help_pages"] = admin_help_pages
+    context.user_data["admin_help_page"] = 0
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("◀️ قبلی", callback_data="admin_help_prev"),
+            InlineKeyboardButton(f"1/{len(admin_help_pages)}", callback_data="admin_help_current"),
+            InlineKeyboardButton("بعدی ▶️", callback_data="admin_help_next")
+        ],
+        [InlineKeyboardButton("🔙 بازگشت به منوی راهنما", callback_data="back_to_help_menu")],
+        [InlineKeyboardButton("❌ بستن", callback_data="help_close")]
+    ]
+    
+    await update.message.reply_text(
+        admin_help_pages[0],
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+
+
+async def show_user_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش راهنمای کاربران با صفحه‌بندی"""
+    user_help_pages = [
+        # صفحه 1 - مقدمه
+        "👤 **راهنمای کاربران - صفحه 1/4**\n\n"
+        "🌟 **به ربات مدیریت ورزشی خوش آمدید**\n\n"
+        "این ربات برای ثبت‌نام در رشته‌های ورزشی طراحی شده است.\n\n"
+        "➖➖➖➖➖➖➖➖➖\n"
+        "از دکمه‌های زیر برای مشاهده صفحات استفاده کنید.",
+        
+        # صفحه 2 - نحوه ثبت‌نام
+        "👤 **راهنمای کاربران - صفحه 2/4**\n\n"
+        "📝 **نحوه ثبت‌نام:**\n\n"
+        "1️⃣ از منوی اصلی رشته مورد نظر را انتخاب کنید:\n"
+        "   • ⚽ فوتسال\n"
+        "   • 🏀 بسکتبال\n"
+        "   • 🏐 والیبال\n"
+        "   • 🤝 اشتراکی\n\n"
+        "2️⃣ تایم مورد نظر را از لیست انتخاب کنید\n\n"
+        "3️⃣ شماره موبایل خود را وارد کنید\n\n"
+        "✅ ثبت‌نام شما با موفقیت انجام می‌شود",
+        
+        # صفحه 3 - نکات مهم
+        "👤 **راهنمای کاربران - صفحه 3/4**\n\n"
+        "⚠️ **نکات مهم:**\n\n"
+        "• فقط در روز مسابقه می‌توانید ثبت‌نام کنید\n"
+        "• ۳۰ دقیقه قبل از شروع تایم، ثبت‌نام بسته می‌شود\n"
+        "• هر کاربر فقط یک بار در هر تایم می‌تواند ثبت‌نام کند\n"
+        "• ظرفیت هر تایم محدود است\n"
+        "• شماره موبایل باید با ۰۹ شروع شود (۱۱ رقم)",
+        
+        # صفحه 4 - امکانات دیگر
+        "👤 **راهنمای کاربران - صفحه 4/4**\n\n"
+        "📋 **سایر امکانات:**\n\n"
+        "• **📋 لیست ثبت‌نام‌ها**: مشاهده ثبت‌نام‌کنندگان هر تایم\n"
+        "• **📨 تماس با ادمین**: ارسال پیام به مدیر\n"
+        "• **❓ راهنما**: همین راهنما\n\n"
+        "🔒 **عضویت در کانال:**\n"
+        "برای استفاده از ربات باید در کانال‌های اجباری عضو باشید"
+    ]
+    
+    query = update.callback_query
+    await query.answer()
+    
+    # ذخیره صفحات در context.user_data
+    context.user_data["user_help_pages"] = user_help_pages
+    context.user_data["user_help_page"] = 0
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("◀️ قبلی", callback_data="user_help_prev"),
+            InlineKeyboardButton(f"1/{len(user_help_pages)}", callback_data="user_help_current"),
+            InlineKeyboardButton("بعدی ▶️", callback_data="user_help_next")
+        ],
+        [InlineKeyboardButton("🔙 بازگشت به منوی راهنما", callback_data="back_to_help_menu")],
+        [InlineKeyboardButton("❌ بستن", callback_data="help_close")]
+    ]
+    
+    await query.edit_message_text(
+        user_help_pages[0],
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر همه دکمه‌های راهنما"""
+    query = update.callback_query
+    await query.answer()
+    
+    data = query.data
+    
+    if data == "help_user":
+        await show_user_help(update, context)
+    
+    elif data == "help_admin_password":
+        await help_admin_password(update, context)
+    
+    elif data == "back_to_help_menu":
+        keyboard = [
+            [InlineKeyboardButton("👤 راهنمای کاربران", callback_data="help_user")],
+            [InlineKeyboardButton("👑 راهنمای ادمین", callback_data="help_admin_password")],
+            [InlineKeyboardButton("🔙 بازگشت", callback_data="help_back")]
+        ]
+        await query.edit_message_text(
+            "📚 **راهنمای ربات**\n\n"
+            "لطفاً یکی از گزینه‌ها را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    
+    elif data == "help_back":
+        await query.message.delete()
+    
+    elif data == "help_close":
+        await query.message.delete()
+    
+    # صفحه‌بندی راهنمای ادمین
+    elif data.startswith("admin_help_"):
+        pages = context.user_data.get("admin_help_pages", [])
+        current_page = context.user_data.get("admin_help_page", 0)
+        
+        if data == "admin_help_next" and current_page < len(pages) - 1:
+            current_page += 1
+        elif data == "admin_help_prev" and current_page > 0:
+            current_page -= 1
+        else:
+            return
+        
+        context.user_data["admin_help_page"] = current_page
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("◀️ قبلی", callback_data="admin_help_prev"),
+                InlineKeyboardButton(f"{current_page + 1}/{len(pages)}", callback_data="admin_help_current"),
+                InlineKeyboardButton("بعدی ▶️", callback_data="admin_help_next")
+            ],
+            [InlineKeyboardButton("🔙 بازگشت به منوی راهنما", callback_data="back_to_help_menu")],
+            [InlineKeyboardButton("❌ بستن", callback_data="help_close")]
+        ]
+        
+        await query.edit_message_text(
+            pages[current_page],
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    
+    # صفحه‌بندی راهنمای کاربران
+    elif data.startswith("user_help_"):
+        pages = context.user_data.get("user_help_pages", [])
+        current_page = context.user_data.get("user_help_page", 0)
+        
+        if data == "user_help_next" and current_page < len(pages) - 1:
+            current_page += 1
+        elif data == "user_help_prev" and current_page > 0:
+            current_page -= 1
+        else:
+            return
+        
+        context.user_data["user_help_page"] = current_page
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("◀️ قبلی", callback_data="user_help_prev"),
+                InlineKeyboardButton(f"{current_page + 1}/{len(pages)}", callback_data="user_help_current"),
+                InlineKeyboardButton("بعدی ▶️", callback_data="user_help_next")
+            ],
+            [InlineKeyboardButton("🔙 بازگشت به منوی راهنما", callback_data="back_to_help_menu")],
+            [InlineKeyboardButton("❌ بستن", callback_data="help_close")]
+        ]
+        
+        await query.edit_message_text(
+            pages[current_page],
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
 
 # ======================================================
 # MAIN
@@ -3104,6 +3425,20 @@ def main():
     app.add_handler(CommandHandler("cancel", cancel_contact))
 
 
+    # هندلر راهنما
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^❓ راهنما$"),
+        help_menu
+    ))
+    
+    # هندلر بررسی رمز ادمین
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        check_admin_password
+    ))
+    
+    # هندلر دکمه‌های راهنما
+    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern="^(help_|admin_help_|user_help_|back_to_help_menu)"))
     
 
     # JobQueue برای گزارش شبانه
