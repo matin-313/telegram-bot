@@ -3272,7 +3272,86 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
+
+
+async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر یکپارچه برای همه پیام‌های متنی"""
+    user_id = update.effective_user.id
+    text = update.message.text
+    
+    # 1️⃣ اول بررسی کنیم کاربر در حالت انتظار رمز ادمین هست؟
+    if context.user_data.get("waiting_for_admin_password"):
+        password = text.strip()
         
+        if password == ADMIN_PASSWORD:
+            context.user_data.pop("waiting_for_admin_password", None)
+            await show_admin_help(update, context)
+        else:
+            await update.message.reply_text(
+                "❌ **رمز عبور اشتباه است!**\n\n"
+                "دسترسی غیرمجاز به بخش ادمین ثبت شد.",
+                parse_mode="Markdown"
+            )
+            context.user_data.pop("waiting_for_admin_password", None)
+        return
+    
+    # 2️⃣ بعد بررسی کنیم کاربر در حالت ارسال پیام به ادمین هست؟
+    if user_id in WAITING_FOR_MESSAGE and WAITING_FOR_MESSAGE[user_id]:
+        # دریافت پیام کاربر و ارسال به ادمین‌ها
+        user = update.effective_user
+        message_text = text
+        
+        user_info = USERS.get(user_id, {})
+        user_name = user_info.get("full_name", user.full_name)
+        username = user_info.get("username", user.username)
+        
+        admin_text = (
+            f"📨 **پیام جدید از کاربر**\n\n"
+            f"👤 **نام:** {user_name}\n"
+            f"🆔 **آیدی:** `{user_id}`\n"
+        )
+        
+        if username:
+            admin_text += f"📱 **یوزرنیم:** @{username}\n"
+        
+        admin_text += f"\n💬 **متن پیام:**\n{message_text}\n\n"
+        admin_text += "➖➖➖➖➖➖➖➖➖\n"
+        admin_text += "📌 **برای پاسخ از دستور زیر استفاده کنید:**\n"
+        admin_text += f"`/reply {user_id} متن پاسخ شما`"
+        
+        sent_count = 0
+        for admin_id in SUPER_ADMINS + VIEWER_ADMINS:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=admin_text,
+                    parse_mode="Markdown"
+                )
+                sent_count += 1
+            except Exception as e:
+                print(f"❌ خطا در ارسال به ادمین {admin_id}: {e}")
+        
+        if sent_count > 0:
+            await update.message.reply_text(
+                "✅ پیام شما با موفقیت به ادمین ارسال شد.\n"
+                "به زودی پاسخ شما داده خواهد شد.",
+                parse_mode="Markdown"
+            )
+        else:
+            await update.message.reply_text(
+                "❌ متأسفانه در ارسال پیام مشکل پیش آمد. لطفاً بعداً تلاش کنید.",
+                parse_mode="Markdown"
+            )
+        
+        WAITING_FOR_MESSAGE.pop(user_id, None)
+        return
+    
+    # 3️⃣ اگر هیچکدام نبود، پیام نامعتبر است
+    await update.message.reply_text(
+        "❌ **پیام نامعتبر**\n\n"
+        "لطفاً از دکمه‌های منو استفاده کنید یا دستور /start را بزنید.",
+        parse_mode="Markdown"
+    )
 
 # ======================================================
 # MAIN
@@ -3426,19 +3505,11 @@ def main():
     ))
     
 
-    # ✅ هندلر عمومی کاربران (باید آخر باشه)
+    # ✅ فقط یک هندلر برای همه پیام‌های غیردستور
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
-        handle_user_message
+        handle_all_messages
     ))
-
-    
-    # ✅ هندلر بررسی رمز ادمین
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        check_admin_password
-    ))
-    
     
     app.add_handler(CommandHandler("cancel", cancel_contact))
     
