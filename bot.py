@@ -30,7 +30,7 @@ from telegram.ext import (
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 SUPER_ADMINS = [6807376124]
-VIEWER_ADMINS = [1234567890]  
+VIEWER_ADMINS = [6807376124]  
 
 
 REPORT_TIME = time(23, 59)
