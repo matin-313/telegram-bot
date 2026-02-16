@@ -8,6 +8,8 @@ import logging
 from datetime import datetime, time
 from datetime import date, datetime, time, timedelta
 import jdatetime 
+import pytz
+from datetime import datetime, time, date, timedelta
 import asyncio  
 from telegram import (
     Update,
@@ -146,6 +148,26 @@ ADMIN_PASSWORD = "admin5686"
 
 
 # ======================================================
+# IRAN TIME UTILS
+# ======================================================
+
+TEHRAN_TZ = pytz.timezone('Asia/Tehran')
+
+def get_iran_now():
+    """دریافت زمان فعلی به وقت ایران"""
+    return datetime.now(TEHRAN_TZ)
+
+def get_iran_date():
+    """دریافت تاریخ امروز به وقت ایران"""
+    return get_iran_now().date()
+
+def get_iran_datetime():
+    """دریافت datetime امروز به وقت ایران"""
+    return get_iran_now()
+
+
+
+# ======================================================
 # normalize phone
 # ======================================================
 def normalize_phone(raw: str) -> str:
@@ -206,7 +228,7 @@ def is_time_expired(time_dict):
     if not time_date:
         return True
     
-    today = date.today()
+    today = get_iran_date()
     return time_date < today  # اگر تاریخش گذشته باشه
 
 # ======================================================
@@ -838,7 +860,8 @@ async def time_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data.split(":")
     sport = data[0]
-    today = date.today()
+    today = get_iran_date()  # ← تاریخ امروز به وقت ایران
+
 
     # فوتسال گروهی
     if sport == "futsal":
@@ -1273,7 +1296,7 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
 # ======================================================
 async def cleanup_expired_times():
     """پاک کردن تایم‌های منقضی شده و ثبت‌نام‌های مربوطه"""
-    today = date.today()
+    today = get_iran_date()  # ← تاریخ امروز به وقت ایران
     
     # فوتسال
     for g in "ABCDEFGHIJ":
@@ -3000,7 +3023,7 @@ async def reply_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def is_time_locked(time_date, time_start):
     """
     بررسی اینکه تایم قفل شده یا نه
-    اگر کمتر از 5 دقیقه به شروع مونده باشه، قفل است
+    اگر کمتر از 30 دقیقه به شروع مونده باشه، قفل است
     """
     if not time_date or not time_start:
         return False
@@ -3010,7 +3033,10 @@ def is_time_locked(time_date, time_start):
     try:
         # تبدیل به datetime
         start_datetime = datetime.strptime(time_start_str, "%Y-%m-%d %H:%M")
-        now = datetime.now()
+        
+        start_datetime = TEHRAN_TZ.localize(start_datetime)
+
+        now = get_iran_datetime()
         
         # محاسبه اختلاف زمان
         time_diff = (start_datetime - now).total_seconds() / 60  # به دقیقه
