@@ -3412,18 +3412,6 @@ def main():
 
     app.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^broadcast_"))
 
-    
-    
-    app.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^📨 تماس با ادمین$"),
-        contact_admin
-    ))
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_user_message
-    ))
-    app.add_handler(CommandHandler("cancel", cancel_contact))
-
 
     # هندلر راهنما
     app.add_handler(MessageHandler(
@@ -3439,6 +3427,18 @@ def main():
     
     # هندلر دکمه‌های راهنما
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern="^(help_|admin_help_|user_help_|back_to_help_menu)"))
+
+
+    
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📨 تماس با ادمین$"),
+        contact_admin
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_user_message
+    ))
+    app.add_handler(CommandHandler("cancel", cancel_contact))
     
 
     # JobQueue برای گزارش شبانه
