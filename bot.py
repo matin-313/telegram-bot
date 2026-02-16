@@ -3425,17 +3425,20 @@ def main():
         help_menu
     ))
     
+
+    # ✅ هندلر عمومی کاربران (باید آخر باشه)
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_user_message
+    ))
+
+    
     # ✅ هندلر بررسی رمز ادمین
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         check_admin_password
     ))
     
-    # ✅ هندلر عمومی کاربران (باید آخر باشه)
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_user_message
-    ))
     
     app.add_handler(CommandHandler("cancel", cancel_contact))
     
