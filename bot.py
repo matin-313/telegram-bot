@@ -224,6 +224,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ذخیره اطلاعات کاربر
     user = update.effective_user
     user_id = user.id
+
+    # بررسی میکنیم آیا کاربر قبلاً راهنما رو دیده یا نه
+    # می‌تونیم این رو در USERS ذخیره کنیم
+    is_new = False
     
     # اگه کاربر قبلاً ذخیره نشده بود، ذخیره کن
     if user_id not in USERS:
@@ -237,7 +241,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         print(f"✅ کاربر جدید: {user.full_name} ({user_id})")
 
-
+    # اگه کاربر جدید باشه یا راهنما رو ندیده باشه
+    if is_new or not USERS[user_id].get("help_seen", False):
+        
+        warning_text = (
+            f"⚠️⚠️⚠️ **هشدار مهم** ⚠️⚠️⚠️\n\n"
+            f"👋 {user.first_name} عزیز، خوش آمدید!\n\n"
+            f"📌 **لطفاً قبل از هر اقدامی، حتماً راهنمای ربات را مطالعه کنید.**\n\n"
+            f"❌ عدم مطالعه راهنما ممکن است منجر به:\n"
+            f"• ثبت‌نام نادرست\n"
+            f"• از دست دادن تایم‌ها\n"
+            f"• سردرگمی در استفاده\n\n"
+            f"✅ برای مشاهده راهنما، روی دکمه زیر کلیک کنید:\n"
+            f"➖➖➖➖➖➖➖➖➖\n"
+            f"📚 **دکمه '❓ راهنما' در منوی اصلی**"
+        )
+        
+        # دکمه مخصوص برای رفتن مستقیم به راهنما
+        help_keyboard = [
+            [InlineKeyboardButton("📚 رفتن به راهنما", callback_data="help_user")],
+            [InlineKeyboardButton("✅ متوجه شدم، ادامه میدم", callback_data="help_acknowledge")]
+        ]
+        
+        await update.message.reply_text(
+            warning_text,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(help_keyboard)
+        )
+        return  # منتظر می‌مونیم کاربر راهنما رو ببینه
+    
+    # اگه کاربر قبلاً راهنما رو دیده بود
     keyboard = [
         ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
         ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"],
@@ -3353,6 +3386,37 @@ async def handle_all_messages(update: Update, context: ContextTypes.DEFAULT_TYPE
         parse_mode="Markdown"
     )
 
+
+async def help_acknowledge_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی کاربر تایید کرد که راهنما رو دیده"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    
+    # ثبت اینکه کاربر راهنما رو دیده
+    if user_id in USERS:
+        USERS[user_id]["help_seen"] = True
+    
+    # حذف پیام قبلی
+    await query.message.delete()
+    
+    # نمایش منوی اصلی
+    keyboard = [
+        ["⚽ فوتسال", "🏀 بسکتبال", "🏐 والیبال"],
+        ["🤝 اشتراکی", "📋 لیست ثبت‌نام‌ها"],
+        ["📨 تماس با ادمین", "❓ راهنما"]  
+    ]
+    
+    await query.message.reply_text(
+        "🏟 ممنون! حالا می‌توانید از منوی زیر استفاده کنید:",
+        reply_markup=ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True
+        )
+    )
+
+
 # ======================================================
 # MAIN
 # ======================================================
@@ -3490,6 +3554,9 @@ def main():
 
 
     app.add_handler(CallbackQueryHandler(broadcast_callback, pattern="^broadcast_"))
+
+    # بعد از هندلرهای دیگه، این رو اضافه کن:
+    app.add_handler(CallbackQueryHandler(help_acknowledge_callback, pattern="^help_acknowledge$"))
 
 
     # ✅ هندلر تماس با ادمین
