@@ -1355,7 +1355,7 @@ async def cleanup_expired_times():
         if is_time_expired(t):
             expired_indices.append(i)
     
-    (expired_indices):
+for i in reversed(expired_indices):
         time_key = f"time_{i}"
         time_id = RAM_TIMES["basketball"][i].get("id")  # ✅ گرفتن id
         
