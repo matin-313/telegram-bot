@@ -375,11 +375,38 @@ class Database:
                 conn.commit()
                 return cursor.lastrowid
     
-    def delete_futsal_time(self, group, index):
-        """حذف تایم فوتسال با ایندکس (بعداً باید با id واقعی کار کنی)"""
-        # این یه نسخه سادست - بعداً باید با id کار کنی
-        pass
+    def delete_futsal_time(self, time_id):
+        """حذف تایم فوتسال با id"""
+        with self.lock:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM futsal_times WHERE id=?', (time_id,))
+                conn.commit()
+        
+    def delete_basketball_time(self, time_id):
+        """حذف تایم بسکتبال با id"""
+        with self.lock:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM basketball_times WHERE id=?', (time_id,))
+                conn.commit()
     
+    def delete_volleyball_time(self, time_id):
+        """حذف تایم والیبال با id"""
+        with self.lock:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM volleyball_times WHERE id=?', (time_id,))
+                conn.commit()
+    
+    def delete_shared_time(self, time_id):
+        """حذف تایم اشتراکی با id"""
+        with self.lock:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM shared_times WHERE id=?', (time_id,))
+                conn.commit()
+
     def save_basketball_time(self, time_data):
         """ذخیره تایم بسکتبال"""
         with self.lock:
@@ -396,6 +423,43 @@ class Database:
                     time_data["date_obj"].isoformat()
                 ))
                 conn.commit()
+                return cursor.lastrowid 
+
+    def save_volleyball_time(self, time_data):
+        """ذخیره تایم والیبال"""
+        with self.lock:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO volleyball_times (date, start, end, cap, date_obj)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    time_data["date"],
+                    time_data["start"],
+                    time_data["end"],
+                    time_data["cap"],
+                    time_data["date_obj"].isoformat()
+                ))
+                conn.commit()
+                return cursor.lastrowid  # ✅ برگردوندن id
+    
+    def save_shared_time(self, time_data):
+        """ذخیره تایم اشتراکی"""
+        with self.lock:
+            with sqlite3.connect(self.db_file) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO shared_times (date, start, end, cap, date_obj)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (
+                    time_data["date"],
+                    time_data["start"],
+                    time_data["end"],
+                    time_data["cap"],
+                    time_data["date_obj"].isoformat()
+                ))
+                conn.commit()
+                return cursor.lastrowid  # ✅ برگردوندن id
     
     # ========== توابع همگام‌سازی ثبت‌نام‌ها ==========
     
