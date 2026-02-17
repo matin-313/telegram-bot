@@ -2,6 +2,7 @@
 # IMPORTS
 # ======================================================
 import os
+from database import Database
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackQueryHandler
 import logging
@@ -23,6 +24,13 @@ from telegram.ext import (
     ContextTypes,
     filters
 )
+
+
+# ======================================================
+# DATABASE 
+# ======================================================
+# ایجاد نمونه دیتابیس
+db = Database()
 
 # ======================================================
 # CONFIG
@@ -249,16 +257,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # اگه کاربر قبلاً ذخیره نشده بود، ذخیره کن
     if user_id not in USERS:
-        USERS[user_id] = {
+        user_data = {
             "first_name": user.first_name,
             "last_name": user.last_name,
             "username": user.username,
             "full_name": user.full_name,
             "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "language": user.language_code,
-            "help_seen": False  # ← اضافه کردن فیلد help_seen
+            "help_seen": False
         }
-        is_new = True  # ✅ اینجا is_new رو True می‌کنیم
+        USERS[user_id] = user_data
+        db.save_user(user_id, user_data)  # ✅ این خط اضافه بشه
+        is_new = True
         print(f"✅ کاربر جدید: {user.full_name} ({user_id})")
 
     # اگه کاربر جدید باشه یا راهنما رو ندیده باشه
@@ -384,6 +394,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         time_key = f"time_{real_idx}"
         registrations = RAM_REGISTRATIONS["futsal"][real_group].setdefault(time_key, {})
+        db.save_registration(sport, real_group, time_key, phone, player_name)
 
     elif sport == "shared":
         # ساخت all_times مثل time_select
@@ -410,6 +421,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS["shared"].setdefault(time_key, {})
+        db.save_registration(sport, "", time_key, phone, player_name)
 
     else:  # بسکتبال و والیبال
         # ساخت all_times مثل time_select
@@ -440,6 +452,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS[sport].setdefault(time_key, {})
+        db.save_registration(sport, "", time_key, phone, player_name)
 
     capacity = slot.get("cap", 0)
 
@@ -1005,6 +1018,7 @@ async def add_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         RAM_PLAYERS["basketball"][phone] = full_name
+        db.save_basketball_player(phone, full_name)  
         
         print(f"✅ بازیکن بسکتبال اضافه شد: {phone} -> {full_name}")
         await update.message.reply_text(
@@ -1051,6 +1065,7 @@ async def add_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         RAM_PLAYERS["volleyball"][phone] = full_name
+        db.save_volleyball_player(phone, full_name)  
         
         print(f"✅ بازیکن والیبال اضافه شد: {phone} -> {full_name}")
         await update.message.reply_text(
@@ -1099,16 +1114,17 @@ async def add_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("❌ این تاریخ گذشته است!")
             return
 
-        RAM_TIMES["basketball"].append({
+        time_data = {
             "date": date_obj.isoformat(),
             "date_obj": date_obj,
             "start": start,
             "end": end,
             "cap": int(cap)
-        })
-
-        # مرتب‌سازی بر اساس تاریخ
+        }
+        
+        RAM_TIMES["basketball"].append(time_data)
         RAM_TIMES["basketball"].sort(key=lambda x: x["date_obj"])
+        db.save_basketball_time(time_data)  
         
         # نمایش تاریخ شمسی
         j_date = jdatetime.date.fromgregorian(date=date_obj)
@@ -1152,15 +1168,17 @@ async def add_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("❌ این تاریخ گذشته است!")
             return
 
-        RAM_TIMES["volleyball"].append({
+        time_data = {
             "date": date_obj.isoformat(),
             "date_obj": date_obj,
             "start": start,
             "end": end,
             "cap": int(cap)
-        })
-
+        }
+        
+        RAM_TIMES["volleyball"].append(time_data)
         RAM_TIMES["volleyball"].sort(key=lambda x: x["date_obj"])
+        db.save_volleyball_time(time_data)  
         
         j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
@@ -1221,6 +1239,7 @@ async def add_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE, g
 
         # ذخیره با نام کامل
         RAM_PLAYERS["futsal"][group][phone] = full_name
+        db.save_futsal_player(group, phone, full_name)  
         
         print(f"✅ بازیکن فوتسال اضافه شد: گروه {group}, {phone} -> {full_name}")
 
@@ -1266,15 +1285,17 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
             await update.message.reply_text("❌ این تاریخ گذشته است!")
             return
 
-        RAM_TIMES["futsal"][group].append({
+        time_data = {
             "date": date_obj.isoformat(),
             "date_obj": date_obj,
             "start": start,
             "end": end,
             "cap": int(cap)
-        })
-
+        }
+        
+        RAM_TIMES["futsal"][group].append(time_data)
         RAM_TIMES["futsal"][group].sort(key=lambda x: x["date_obj"])
+        db.save_futsal_time(group, time_data)  
         
         j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
@@ -1411,6 +1432,7 @@ async def remove_group_player(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         # حذف بازیکن
         del RAM_PLAYERS["futsal"][group][phone]
+        db.delete_futsal_player(group, phone)  
         
         await update.message.reply_text(
             f"✅ بازیکن از گروه {group} حذف شد:\n"
@@ -1458,6 +1480,8 @@ async def remove_basketball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # حذف بازیکن
         del RAM_PLAYERS["basketball"][phone]
+        db.delete_basketball_player(phone)  
+        
         
         await update.message.reply_text(
             f"✅ بازیکن بسکتبال حذف شد:\n"
@@ -1505,6 +1529,7 @@ async def remove_volleyball(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # حذف بازیکن
         del RAM_PLAYERS["volleyball"][phone]
+        db.delete_volleyball_player(phone)  
         
         await update.message.reply_text(
             f"✅ بازیکن والیبال حذف شد:\n"
@@ -1749,15 +1774,17 @@ async def add_shared_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ این تاریخ گذشته است!")
             return
 
-        RAM_TIMES["shared"].append({
+        time_data = {
             "date": date_obj.isoformat(),
             "date_obj": date_obj,
             "start": start,
             "end": end,
             "cap": int(cap)
-        })
-
+        }
+        
+        RAM_TIMES["shared"].append(time_data)
         RAM_TIMES["shared"].sort(key=lambda x: x["date_obj"])
+        db.save_shared_time(time_data)  
         
         j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
@@ -3476,6 +3503,7 @@ async def help_acknowledge_callback(update: Update, context: ContextTypes.DEFAUL
     # ثبت اینکه کاربر راهنما رو دیده
     if user_id in USERS:
         USERS[user_id]["help_seen"] = True
+        db.save_user(user_id, USERS[user_id]) 
     
     # حذف پیام قبلی
     await query.message.delete()
@@ -3536,8 +3564,22 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # MAIN
 # ======================================================
 def main():
-    # ✅ مقداردهی اولیه ساختارها
-    global RAM_PLAYERS, RAM_TIMES, RAM_REGISTRATIONS
+    global RAM_PLAYERS, RAM_TIMES, RAM_REGISTRATIONS, USERS, db
+    
+    # ✅ لود دیتا از دیتابیس
+    print("🔄 در حال لود دیتا از دیتابیس...")
+    data = db.load_all_to_ram()
+    USERS = data["USERS"]
+    RAM_PLAYERS = data["RAM_PLAYERS"]
+    RAM_TIMES = data["RAM_TIMES"]
+    RAM_REGISTRATIONS = data["RAM_REGISTRATIONS"]
+    
+    print(f"✅ دیتابیس لود شد:")
+    print(f"   • {len(USERS)} کاربر")
+    print(f"   • {sum(len(g) for g in RAM_PLAYERS['futsal'].values())} بازیکن فوتسال")
+    print(f"   • {len(RAM_PLAYERS['basketball'])} بازیکن بسکتبال")
+    print(f"   • {len(RAM_PLAYERS['volleyball'])} بازیکن والیبال")
+    
     
     RAM_PLAYERS = {
         "futsal": {g: {} for g in "ABCDEFGHIJ"},
