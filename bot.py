@@ -538,6 +538,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
             RAM_PLAYERS["shared"] = {}
         if phone not in RAM_PLAYERS["shared"]:
             RAM_PLAYERS["shared"][phone] = player_name
+            db.save_shared_player(phone, player_name)
 
     else:  # بسکتبال و والیبال
         print(f"   بررسی {sport} - محتوای RAM_PLAYERS[{sport}]: {RAM_PLAYERS.get(sport, {})}")
@@ -1128,7 +1129,8 @@ async def add_basketball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         RAM_TIMES["basketball"].append(time_data)
         RAM_TIMES["basketball"].sort(key=lambda x: x["date_obj"])
-        db.save_basketball_time(time_data)  
+        time_id = db.save_basketball_time(time_data)  # ✅ ذخیره و گرفتن id
+        RAM_TIMES["basketball"][-1]["id"] = time_id  # ✅ این خط جدید
         
         # نمایش تاریخ شمسی
         j_date = jdatetime.date.fromgregorian(date=date_obj)
@@ -1182,7 +1184,8 @@ async def add_volleyball_time(update: Update, context: ContextTypes.DEFAULT_TYPE
         
         RAM_TIMES["volleyball"].append(time_data)
         RAM_TIMES["volleyball"].sort(key=lambda x: x["date_obj"])
-        db.save_volleyball_time(time_data)  
+        time_id = db.save_volleyball_time(time_data)  # ✅ ذخیره و گرفتن id
+        RAM_TIMES["volleyball"][-1]["id"] = time_id  # ✅ این خط جدید 
         
         j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
@@ -1299,7 +1302,8 @@ async def add_group_time(update: Update, context: ContextTypes.DEFAULT_TYPE, gro
         
         RAM_TIMES["futsal"][group].append(time_data)
         RAM_TIMES["futsal"][group].sort(key=lambda x: x["date_obj"])
-        db.save_futsal_time(group, time_data)  
+        time_id = db.save_futsal_time(group, time_data)  # ✅ ذخیره و گرفتن id
+        RAM_TIMES["futsal"][group][-1]["id"] = time_id  # ✅ این خط جدید 
         
         j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
@@ -1333,11 +1337,16 @@ async def cleanup_expired_times():
         
         for i in reversed(expired_indices):
             time_key = f"time_{i}"
+            time_id = RAM_TIMES["futsal"][g][i].get("id")  # ✅ گرفتن id
+            
             if time_key in RAM_REGISTRATIONS["futsal"][g]:
-                # ✅ پاک کردن از دیتابیس (این دو خط رو اضافه کن)
                 for phone in list(RAM_REGISTRATIONS["futsal"][g][time_key].keys()):
                     db.delete_registration("futsal", g, time_key, phone)
                 del RAM_REGISTRATIONS["futsal"][g][time_key]
+            
+            if time_id:  # ✅ پاک کردن تایم از دیتابیس
+                db.delete_futsal_time(time_id)
+            
             del RAM_TIMES["futsal"][g][i]
     
     # بسکتبال
@@ -1346,13 +1355,18 @@ async def cleanup_expired_times():
         if is_time_expired(t):
             expired_indices.append(i)
     
-    for i in reversed(expired_indices):
+    (expired_indices):
         time_key = f"time_{i}"
+        time_id = RAM_TIMES["basketball"][i].get("id")  # ✅ گرفتن id
+        
         if time_key in RAM_REGISTRATIONS["basketball"]:
-            # ✅ پاک کردن از دیتابیس (این دو خط رو اضافه کن)
             for phone in list(RAM_REGISTRATIONS["basketball"][time_key].keys()):
                 db.delete_registration("basketball", "", time_key, phone)
             del RAM_REGISTRATIONS["basketball"][time_key]
+        
+        if time_id:  # ✅ پاک کردن تایم از دیتابیس
+            db.delete_basketball_time(time_id)
+        
         del RAM_TIMES["basketball"][i]
     
     # والیبال
@@ -1361,13 +1375,18 @@ async def cleanup_expired_times():
         if is_time_expired(t):
             expired_indices.append(i)
     
-    for i in reversed(expired_indices):
+    (expired_indices):
         time_key = f"time_{i}"
+        time_id = RAM_TIMES["volleyball"][i].get("id")  # ✅ گرفتن id
+        
         if time_key in RAM_REGISTRATIONS["volleyball"]:
-            # ✅ پاک کردن از دیتابیس (این دو خط رو اضافه کن)
             for phone in list(RAM_REGISTRATIONS["volleyball"][time_key].keys()):
                 db.delete_registration("volleyball", "", time_key, phone)
             del RAM_REGISTRATIONS["volleyball"][time_key]
+        
+        if time_id:  # ✅ پاک کردن تایم از دیتابیس
+            db.delete_volleyball_time(time_id)
+        
         del RAM_TIMES["volleyball"][i]
 
 
@@ -1794,7 +1813,8 @@ async def add_shared_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         RAM_TIMES["shared"].append(time_data)
         RAM_TIMES["shared"].sort(key=lambda x: x["date_obj"])
-        db.save_shared_time(time_data)  
+        time_id = db.save_shared_time(time_data)  # ✅ ذخیره و گرفتن id
+        RAM_TIMES["shared"][-1]["id"] = time_id  # ✅ این خط جدید 
         
         j_date = jdatetime.date.fromgregorian(date=date_obj)
         await update.message.reply_text(
