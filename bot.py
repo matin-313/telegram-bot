@@ -394,7 +394,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         time_key = f"time_{real_idx}"
         registrations = RAM_REGISTRATIONS["futsal"][real_group].setdefault(time_key, {})
-        db.save_registration(sport, real_group, time_key, phone, player_name)
 
     elif sport == "shared":
         # ساخت all_times مثل time_select
@@ -421,7 +420,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS["shared"].setdefault(time_key, {})
-        db.save_registration(sport, "", time_key, phone, player_name)
 
     else:  # بسکتبال و والیبال
         # ساخت all_times مثل time_select
@@ -452,7 +450,6 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         time_key = f"time_{idx}"
         registrations = RAM_REGISTRATIONS[sport].setdefault(time_key, {})
-        db.save_registration(sport, "", time_key, phone, player_name)
 
     capacity = slot.get("cap", 0)
 
@@ -577,6 +574,13 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ─────────── ذخیره نهایی ───────────
     registrations[phone] = player_name
+
+    if sport == "futsal":
+        db.save_registration(sport, real_group, time_key, phone, player_name)
+    elif sport == "shared":
+        db.save_registration(sport, "", time_key, phone, player_name)
+    else:
+        db.save_registration(sport, "", time_key, phone, player_name)
     
     print(f"✅ ثبت‌نام موفق: {player_name} - {phone} در {sport}")
 
@@ -1319,21 +1323,21 @@ async def cleanup_expired_times():
     """پاک کردن تایم‌های منقضی شده و ثبت‌نام‌های مربوطه"""
     today = get_iran_date()  # ← تاریخ امروز به وقت ایران
     
+    
     # فوتسال
     for g in "ABCDEFGHIJ":
-        # تایم‌های منقضی شده را پیدا کن
         expired_indices = []
         for i, t in enumerate(RAM_TIMES["futsal"][g]):
             if is_time_expired(t):
                 expired_indices.append(i)
         
-        # از آخر به اول پاک کن
         for i in reversed(expired_indices):
-            # پاک کردن ثبت‌نام‌های این تایم
             time_key = f"time_{i}"
             if time_key in RAM_REGISTRATIONS["futsal"][g]:
+                # ✅ پاک کردن از دیتابیس (این دو خط رو اضافه کن)
+                for phone in list(RAM_REGISTRATIONS["futsal"][g][time_key].keys()):
+                    db.delete_registration("futsal", g, time_key, phone)
                 del RAM_REGISTRATIONS["futsal"][g][time_key]
-            # پاک کردن تایم
             del RAM_TIMES["futsal"][g][i]
     
     # بسکتبال
@@ -1345,6 +1349,9 @@ async def cleanup_expired_times():
     for i in reversed(expired_indices):
         time_key = f"time_{i}"
         if time_key in RAM_REGISTRATIONS["basketball"]:
+            # ✅ پاک کردن از دیتابیس (این دو خط رو اضافه کن)
+            for phone in list(RAM_REGISTRATIONS["basketball"][time_key].keys()):
+                db.delete_registration("basketball", "", time_key, phone)
             del RAM_REGISTRATIONS["basketball"][time_key]
         del RAM_TIMES["basketball"][i]
     
@@ -1357,6 +1364,9 @@ async def cleanup_expired_times():
     for i in reversed(expired_indices):
         time_key = f"time_{i}"
         if time_key in RAM_REGISTRATIONS["volleyball"]:
+            # ✅ پاک کردن از دیتابیس (این دو خط رو اضافه کن)
+            for phone in list(RAM_REGISTRATIONS["volleyball"][time_key].keys()):
+                db.delete_registration("volleyball", "", time_key, phone)
             del RAM_REGISTRATIONS["volleyball"][time_key]
         del RAM_TIMES["volleyball"][i]
 
@@ -3579,31 +3589,6 @@ def main():
     print(f"   • {sum(len(g) for g in RAM_PLAYERS['futsal'].values())} بازیکن فوتسال")
     print(f"   • {len(RAM_PLAYERS['basketball'])} بازیکن بسکتبال")
     print(f"   • {len(RAM_PLAYERS['volleyball'])} بازیکن والیبال")
-    
-    
-    RAM_PLAYERS = {
-        "futsal": {g: {} for g in "ABCDEFGHIJ"},
-        "basketball": {},
-        "volleyball": {},
-        "shared": {}   
-
-    }
-    
-    RAM_TIMES = {
-        "futsal": {g: [] for g in "ABCDEFGHIJ"},
-        "basketball": [],
-        "volleyball": [],
-        "shared": []  #   
-
-    }
-    
-    RAM_REGISTRATIONS = {
-        "futsal": {g: {} for g in "ABCDEFGHIJ"},
-        "basketball": {},
-        "volleyball": {},
-        "shared": {}    
-
-    }
     
     # ساخت اپلیکیشن
     app = ApplicationBuilder().token(BOT_TOKEN).build()
